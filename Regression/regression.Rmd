@@ -23,9 +23,86 @@ accompanied by a description of its significance. Descriptions must be a minimum
 words, recommended something around 50 words.
 
 ```{r}
+# Load packages
 library(tidyverse)
 library(tidymodels)
 library(ggplot2)
+```
+
+```{r}
+# Load train and test data
+train <- read_csv('train.csv')
+test <- read_csv('test.csv')
+```
+
+```{r}
+str(train)
+```
+
+```{r}
+# Remove `name` column from train
+train <- subset(train, select = -name)
+```
+
+```{r}
+ggplot(train, aes(x = as_factor(x2013_code), y = total_votes)) +
+  geom_bar(stat = "identity")
+```
+
+```{r}
+ggplot(train, aes(x = total_votes, y = percent_dem)) +
+  geom_point() +
+  facet_wrap(~x2013_code) +
+  labs(x = 'Total Votes Cast', y = 'Percent voters who voted Biden', title = 'Biden voters vs Total votes by urban/rural code')
+```
+
+-   More variation in more urban areas
+
+```{r}
+ggplot(train, aes(x = income_per_cap_2020, y = percent_dem)) +
+  geom_point() +
+  facet_wrap(~x2013_code) +
+  labs(x = 'income per capita for the county in 2020 (missing for some counties)', y = 'Percent voters who voted Biden', title = 'Biden voters vs Income per capita by urban/rural code')
+```
+
+-   Higher in urban, lower and clustered in rural
+
+```{r}
+ggplot(train, aes(x = c01_012e, y = income_per_cap_2020)) +
+  geom_abline() +
+  geom_point() +
+  labs(x = 'Estimate:Total:Population 25 years and over:Bachelors degree', y = 'income per capita for the county in 2020 (missing for some counties)', title = '') +
+  coord_obs_pred()
+```
+
+-   Seemingly no interaction between level of education & income
+
+```{r}
+ggplot(train, aes(x = total_votes, y = percent_dem)) +
+  geom_abline() +
+  geom_point() +
+  labs(x = 'Total Votes Cast', y = 'Percent voters who voted Biden')
+```
+
+```{r}
+ggplot(train, aes(x = gdp_2020, y = percent_dem)) +
+  geom_abline() +
+  geom_point() +
+  labs(x = 'GDP for the county in 2020', y = 'Percent voters who voted Biden')
+```
+
+```{r}
+ggplot(train, aes(x = x0009e, y = percent_dem)) +
+  geom_abline() +
+  geom_point() +
+  labs(x = 'Estimate:Total population:20 to 24 years', y = 'Percent voters who voted Biden')
+```
+
+```{r}
+ggplot(train, aes(x = x0014e, y = percent_dem)) +
+  geom_abline() +
+  geom_point() +
+  labs(x = 'Estimate:Total population:60 to 64 years', y = 'Percent voters who voted Biden')
 ```
 
 ## Preprocessing / Recipes - Bobo, Samantha
