@@ -112,8 +112,60 @@ performed and the reasoning behind them.\
 o Length will vary depending on preprocessing steps. \~ 100-500 words seems reasonable.
 
 ```{r}
+library(tidyselect)
+library(recipes)
+library(tidyverse)
+library(dplyr)
+
+# Skewed variable names
+skewed_vars <- all_of(c('x0041e', 'x0042e', 'x0048e', 'x0050e', 'x0052e', 'x0053e', 'x0055e', 'x0056e', 'x0068e', 'x0074e', 'x0081e'))
+
+# Variables with high percentage of zeros
+high_zero_vars <- all_of(c('x0040e', 'x0041e', 'x0042e', 'x0043e', 'x0045e', 'x0046e', 'x0047e', 'x0048e', 'x0049e', 'x0050e', 'x0051e', 'x0052e', 'x0053e', 'x0054e', 'x0055e', 'x0056e'))
+
+rf_recipe <- recipe(percent_dem ~ ., data = train) %>%
+  step_rm(id) %>%
+  step_zv(all_predictors()) %>%
+  step_impute_knn(all_predictors()) %>%
+  step_YeoJohnson(skewed_vars) %>%
+  step_nzv(high_zero_vars, freq_cut = 65/35, unique_cut = 10) %>% #remove near-zero variance predictors
+  step_corr(all_predictors(), threshold = 0.70) %>%
+  step_normalize(all_numeric_predictors(), -all_outcomes())
+  
+# Prep and bake the recipe
+rf_recipe_prep <- prep(rf_recipe, training = train)
+train_baked <- bake(rf_recipe_prep, new_data = train)
 
 ```
+
+Here are the Data Preprocessing Steps we took: 
+1. Identifying Variables: 
+o Skewed Variables: looked at the distributions of all predictors and identified highly skewed distributions
+o High Zero Variables: looked at the training data steps and counted how many zeros occurred on each column
+
+2. Removing ID 
+`step_rm(id)` removes the `id` column from the dataset. IDs are unique to each observation and do not provide useful information for modeling.
+
+3. Removing Zero Variance Predictors 
+`step_zv(all_predictors())` removes predictors that have zero variance as they don't help in making predictions and may lead to model overfitting.
+
+4. K-nearest Neighbors Imputation
+`step_impute_knn`  Unlike median imputation, which fills missing values with the median of the column, k-NN imputation is more dynamic and can offer a better approximation for missing data by considering the feature similarities.
+
+6. Yeo-Johnson Transformation
+`step_YeoJohnson` Skewed variables are transformed using the Yeo-Johnson transformation to approximate a normal distribution. This makes the model more robust to outliers.
+
+7. Removing Near-Zero Variance Predictors
+`step_nrv` Variables with near-zero variance are removed. These are variables that contain values with a frequency that is either too high or too low to be informative. 
+The parameters freq_cut and unique_cut are set to customize the filtering process.
+
+8. Correlation Filtering 
+`step_corr` Correlated predictors (correlation above 0.7) are removed. High correlation among predictors can result in multicollinearity, making the model unstable.
+
+9. Normalization 
+`step_normalize` All numerical variables are normalized to have zero mean and unit variance. This is particularly useful for models sensitive to the scale of input variables.
+
+
 
 ## Candidate models / Model evaluation / tuning - Everyone
 
