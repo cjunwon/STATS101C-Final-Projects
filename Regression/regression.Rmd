@@ -26,6 +26,8 @@ words, recommended something around 50 words.
 # Load packages
 library(tidyverse)
 library(tidymodels)
+library(tidyselect)
+library(recipes)
 ```
 
 ```{r}
@@ -46,12 +48,6 @@ performed and the reasoning behind them.\
 o Length will vary depending on preprocessing steps. \~ 100-500 words seems reasonable.
 
 ```{r}
-library(tidyselect)
-library(recipes)
-library(tidyverse)
-library(dplyr)
-
-
 train <- train %>%
   mutate(across(where(is.numeric), 
                 ~ ifelse(. < quantile(., 0.04, na.rm = TRUE), quantile(., 0.04, na.rm = TRUE), 
