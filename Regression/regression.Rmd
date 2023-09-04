@@ -117,25 +117,45 @@ library(recipes)
 library(tidyverse)
 library(dplyr)
 
+
+train <- train %>%
+  mutate(across(where(is.numeric), 
+                ~ ifelse(. < quantile(., 0.04, na.rm = TRUE), quantile(., 0.04, na.rm = TRUE), 
+                         ifelse(. > quantile(., 0.96, na.rm = TRUE), quantile(., 0.96, na.rm = TRUE), .))))
+
+
+
+
+
 # Skewed variable names
 skewed_vars <- all_of(c('x0041e', 'x0042e', 'x0048e', 'x0050e', 'x0052e', 'x0053e', 'x0055e', 'x0056e', 'x0068e', 'x0074e', 'x0081e'))
 
 # Variables with high percentage of zeros
 high_zero_vars <- all_of(c('x0040e', 'x0041e', 'x0042e', 'x0043e', 'x0045e', 'x0046e', 'x0047e', 'x0048e', 'x0049e', 'x0050e', 'x0051e', 'x0052e', 'x0053e', 'x0054e', 'x0055e', 'x0056e'))
 
+rf_recipe_overfit <- recipe(percent_dem ~ ., data = train) %>%
+  step_rm(id) %>%
+  step_zv(all_predictors()) %>%
+  #step_impute_median(all_predictors(), -all_outcomes()) %>% 
+  step_impute_knn(all_predictors()) %>%
+  step_YeoJohnson(skewed_vars) %>%
+  step_nzv(high_zero_vars, freq_cut = 65/35, unique_cut = 10) %>% 
+  step_corr(all_predictors(), threshold = 0.70) %>%
+  step_normalize(all_numeric_predictors(), -all_outcomes())
+
 rf_recipe <- recipe(percent_dem ~ ., data = train) %>%
   step_rm(id) %>%
   step_zv(all_predictors()) %>%
   step_impute_knn(all_predictors()) %>%
-  step_YeoJohnson(skewed_vars) %>%
-  step_nzv(high_zero_vars, freq_cut = 65/35, unique_cut = 10) %>% #remove near-zero variance predictors
+  step_log(skewed_vars, base = exp(1), offset = 1) %>%
+  step_nzv(high_zero_vars, freq_cut = 65/35, unique_cut = 10) %>%
   step_corr(all_predictors(), threshold = 0.70) %>%
-  step_normalize(all_numeric_predictors(), -all_outcomes())
-  
+  step_normalize(all_numeric_predictors(), -all_outcomes()) 
 # Prep and bake the recipe
+
+
 rf_recipe_prep <- prep(rf_recipe, training = train)
 train_baked <- bake(rf_recipe_prep, new_data = train)
-
 ```
 
 Here are the Data Preprocessing Steps we took: 
