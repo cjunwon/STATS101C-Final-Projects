@@ -1,0 +1,220 @@
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(gridExtra)
+library(ggridges)
+```
+
+```{r}
+train <- read_csv('train.csv')
+```
+
+```{r}
+# Identifying skewed columns:
+
+racial_groups <- train %>%
+  select(x0034e:x0039e, -x0036e, x0044e, x0051e)
+
+racial_groups_tidy <- racial_groups %>%
+  pivot_longer(cols = x0034e:x0051e, names_to = "race", values_to = "population")
+
+# Calculate the IQR for each race group
+racial_groups_tidy <- racial_groups_tidy %>%
+  group_by(race) %>%
+  mutate(
+    Q1 = quantile(population, 0.25),
+    Q3 = quantile(population, 0.75),
+    IQR = Q3 - Q1
+  ) %>%
+  ungroup()
+
+# Define a threshold to determine outliers (e.g., 1.5 times the IQR)
+outlier_threshold <- 1.5
+
+# Remove outliers
+racial_groups_tidy <- racial_groups_tidy %>%
+  filter(population >= (Q1 - outlier_threshold * IQR) & population <= (Q3 + outlier_threshold * IQR))
+
+# Create the density ridgeline plot with outliers removed
+ggplot(racial_groups_tidy, aes(x = population, y = race, fill = race)) +
+  geom_density_ridges() +
+  labs(x = "Population", y = "Racial group", title = "Disribution of sample racial groups (outliers removed)") +
+  theme(text = element_text(size = 11),
+        plot.title = element_text(size = 12),
+        axis.title.x = element_text(hjust = 0.5),
+        axis.title.y = element_text(hjust = 0.5)) +
+  scale_y_discrete(name = "Racial Group",
+                       labels = c("One race", "Two or more races", "White", "Black or African American", "American Indian and Alaska Native", "Asian", "Other Asian")) +
+  guides(fill = "none")
+```
+
+```{r}
+# Box plot for the relationship between total votes and percent_Dem
+ggplot(train, aes(x = as_factor(x2013_code), y = percent_dem)) +
+  geom_boxplot(fill = rainbow(6)) +
+  labs(x = "urban/rural code used by CDC (1 is most urban 6 is most rural)", y = "Percent of voters who voted Biden", title = "Distribution of Percent of Biden Voters by Urban/Rural Code") +
+  theme(text = element_text(size = 12),
+        plot.title = element_text(size = 13))
+```
+
+```{r}
+# Scatterplot sample to show that columns such as population groups require transformations
+
+## scatter plot for the relationship between total votes and percent_Dem
+hisp_lat <- ggplot(train, aes(x = total_votes, y= percent_dem)) +
+  geom_abline() +
+  geom_point() +
+  labs(x = "Population of Hispanic or Latino (of any race)", y = "Percent of voters who voted Biden", title = "Population vs. Percent Biden Voters") +
+  theme(text = element_text(size = 10),
+        plot.title = element_text(size = 12))
+
+## scatter plot for the relationship between total votes and percent_Dem
+hisp_lat_log <- ggplot(train, aes(x = log10(total_votes), y= percent_dem)) +
+  geom_abline() +
+  geom_point() +
+  labs(x = "Population of Hispanic or Latino (of any race) - Log", y = "Percent of voters who voted Biden", title = "Log Population vs. Percent Biden Voters") +
+  theme(text = element_text(size = 10),
+        plot.title = element_text(size = 12))
+
+grid.arrange(hisp_lat, hisp_lat_log, ncol = 2)
+```
+
+```{r}
+# scatter plot for relationship between income_per_cap_2020 and percent_dem
+income_2020 <- ggplot(train, aes(x = income_per_cap_2020, y = percent_dem)) +
+  geom_abline() +
+  geom_point() +
+  labs(x = "Income per capita for the county in 2020", y = "Percent of voters who voted Biden", title = "Biden voters vs Income 2020") +
+  theme(text = element_text(size = 10),
+        plot.title = element_text(size = 12))
+
+### scatter plot for relationship between income_per_cap_2020 and percent_dem
+income_2020_log <- ggplot(train, aes(x = log10(income_per_cap_2020), y = percent_dem)) +
+  geom_abline() +
+  geom_point() +
+  labs(x = "Income per capita for the county in 2020 - log", y = "Percent of voters who voted Biden", title = "Biden voters vs Income 2020 - Log") +
+  theme(text = element_text(size = 10),
+        plot.title = element_text(size = 12))
+
+grid.arrange(income_2020, income_2020_log, ncol = 2)
+```
+
+```{r}
+# scatter plot for relationship between income_per_cap_2020 and percent_dem, grouped by area type
+ggplot(train, aes(x = log(income_per_cap_2020), y = percent_dem)) +
+  geom_point() +
+  facet_wrap(~x2013_code) +
+  labs(x = 'Income per capita for the county in 2020 (missing for some counties)', y = 'Percent voters who voted Biden', title = 'Biden voters vs Income per capita 2020 by urban/rural code') +
+  theme(text = element_text(size = 10),
+        plot.title = element_text(size = 12))
+```
+
+```{r}
+## create a plot based on different education group
+education <- train %>%
+  select(percent_dem, c01_007e:c01_013e)
+
+education_tidy <- education %>%
+  pivot_longer(c("c01_007e", "c01_008e", "c01_009e", "c01_010e", "c01_011e", "c01_012e", "c01_013e"), names_to = "education", values_to = "population")
+
+education_levels <- ggplot(education_tidy, aes(x = population, y = percent_dem, color = education)) +
+  geom_point() +
+  labs(x = "Population (25 years and over)", 
+       y = "Percent of voters who voted Biden",
+       title = "Educational Levels vs. Percent Biden Voters") +
+  scale_color_discrete(name = "Education Level",
+                       labels = c("Less than 9th grade", "9th to 12th grade, no diploma", "High school graduate", "Some college, no degree", "Associate's degree", "Bachelor's degree", "Graduate or professional degree")) + 
+  theme(text = element_text(size = 8),
+        plot.title = element_text(size = 12))
+
+# Log transform
+
+education$c01_007e <- log(education$c01_007e)
+education$c01_008e <- log(education$c01_008e)
+education$c01_009e <- log(education$c01_009e)
+education$c01_010e <- log(education$c01_010e)
+education$c01_011e <- log(education$c01_011e)
+education$c01_012e <- log(education$c01_012e)
+education$c01_013e <- log(education$c01_013e)
+
+education_tidy_log <- education %>%
+  pivot_longer(c("c01_007e", "c01_008e", "c01_009e", "c01_010e", "c01_011e", "c01_012e", "c01_013e"), names_to = "education", values_to = "population")
+
+education_levels_log <- ggplot(education_tidy_log, aes(x = population, y = percent_dem, color = education)) +
+  geom_point() +
+  labs(x = "Population (25 years and over) - Log", 
+       y = "Percent of voters who voted Biden",
+       title = "Educational Levels (Log population) vs. Percent Biden Voters") +
+  scale_color_discrete(name = "Education Level",
+                       labels = c("Less than 9th grade", "9th to 12th grade, no diploma", "High school graduate", "Some college, no degree", "Associate's degree", "Bachelor's degree", "Graduate or professional degree")) + 
+  theme(text = element_text(size = 8),
+        plot.title = element_text(size = 12))
+
+grid.arrange(education_levels, education_levels_log, ncol = 1)
+```
+
+```{r}
+# Sample of similar groups and opposing groups
+
+lower_ed <- ggplot(train, aes(x = log(c01_007e), y = log(c01_008e))) +
+  geom_abline() +
+  geom_point() +
+  labs(x = "Less than 9th grade", y = "9th to 12th grade, no diploma", title = "Lower education group association - Log") +
+  theme(text = element_text(size = 8))
+
+higher_ed <- ggplot(train, aes(x = log(c01_012e), y = log(c01_013e))) +
+  geom_abline() +
+  geom_point() +
+  labs(x = "Bachelor's degree", y = "Graduate or psrofessional degree", title = "Higher education group association - Log") +
+  theme(text = element_text(size = 8))
+
+low_high_ed <- ggplot(train, aes(x = log(c01_007e), y = log(c01_013e))) +
+  geom_abline() +
+  geom_point() +
+  labs(x = "Less than 9th grade", y = "Graduate or professional degree", title = "Less than 9th vs Graduate or Prof - Log") +
+  theme(text = element_text(size = 8))
+
+grid.arrange(lower_ed, higher_ed, low_high_ed, ncol = 2, nrow = 2)
+```
+
+```{r}
+## create a plot based on GDP by year
+gdp <- train %>%
+  select(percent_dem, gdp_2016:gdp_2020)
+
+gdp_tidy <- gdp %>%
+  pivot_longer(cols = c("gdp_2016","gdp_2017","gdp_2018","gdp_2019","gdp_2020"), names_to = "Year", values_to = "GDP")
+
+gdp_plot <- ggplot(gdp_tidy, aes(x = GDP, y = percent_dem, color = Year)) +
+  geom_point() +
+  labs(x = "GDP for county", 
+       y = "Percent of voters who voted Biden",
+       title = "GDP for county vs. Percent Biden Voters") +
+  scale_color_discrete(name = "Year",
+                       labels = c("2016", "2017", "2018", "2019", "2020")) + 
+  theme(text = element_text(size = 8),
+        plot.title = element_text(size = 12))
+
+# Log transform
+
+gdp$gdp_2016 <- log(gdp$gdp_2016)
+gdp$gdp_2017 <- log(gdp$gdp_2017)
+gdp$gdp_2018 <- log(gdp$gdp_2018)
+gdp$gdp_2019 <- log(gdp$gdp_2019)
+gdp$gdp_2020 <- log(gdp$gdp_2020)
+
+gdp_tidy_log <- gdp %>%
+  pivot_longer(cols = c("gdp_2016","gdp_2017","gdp_2018","gdp_2019","gdp_2020"), names_to = "Year", values_to = "GDP")
+
+gdp_plot_log <- ggplot(gdp_tidy_log, aes(x = GDP, y = percent_dem, color = Year)) +
+  geom_point() +
+  labs(x = "GDP for county - Log", 
+       y = "Percent of voters who voted Biden",
+       title = "Log GDP for county vs. Percent Biden Voters") +
+  scale_color_discrete(name = "Year",
+                       labels = c("2016", "2017", "2018", "2019", "2020")) + 
+  theme(text = element_text(size = 8),
+        plot.title = element_text(size = 12))
+
+grid.arrange(gdp_plot, gdp_plot_log, ncol = 1)
+```
