@@ -131,11 +131,98 @@ candidate models\
 ▪ Include a plot (like autoplot) comparing the performance of the different models.
 
 ```{r}
+set.seed(1)
+train_folds <- train %>% vfold_cv(v = 10, strata = 'percent_dem')
+```
+
+
+A random forest model with all columns except id as predictors
+
+```{r}
+rf_recipe_1 <- recipe(percent_dem ~., data = train) %>%
+  step_rm(id) %>%
+  step_impute_knn(all_predictors()) 
+
+rf_model <- rand_forest(trees = 1000) %>% 
+            set_engine("ranger", importance = "impurity")  %>% 
+            set_mode("regression")
+
+rf_workflow <- 
+  workflow() %>%
+  add_recipe(rf_recipe_1) %>%
+  add_model(rf_model)
+
+rf_crossval_fit_1 <- 
+  rf_workflow %>%
+  fit_resamples(train_folds)
+
+rf_crossval_fit_1 %>% 
+  collect_metrics()
 
 ```
+
+
+A random forest model with important variables as predictors 
+
+```{r}
+
+## determine important variables
+rf_fit <- 
+  rf_workflow %>%
+  fit(data = train)
+
+fitted_rf_model <- rf_fit %>% extract_fit_parsnip()
+imp <- data.frame(fitted_rf_model$fit$variable.importance)
+not_imp_var <- rownames(top_n(imp, -40))
+
+rf_recipe_2 <- recipe(percent_dem ~., data = train) %>%
+  step_rm(id) %>%
+  step_rm(all_of(not_imp_var)) %>%
+  step_impute_knn(all_predictors()) 
+
+## a random forest model excludes the 40 least important variables
+rf_workflow_2 <- 
+  workflow() %>%
+  add_recipe(rf_recipe_2) %>%
+  add_model(rf_model)
+
+rf_crossval_fit_2 <- 
+  rf_workflow_2 %>%
+  fit_resamples(train_folds)
+
+rf_crossval_fit_2 %>% 
+  collect_metrics()
+```
+
+
+A random forest model with tuning of mtry
+* this takes hours to run in r
+```{r}
+
+#rf_grid <- expand.grid(mtry=seq(25, 123, 7))
+
+#rf_model_3 <- rand_forest(trees = 1000, mtry = tune()) %>% 
+#            set_engine("ranger")  %>% 
+ #           set_mode("regression")
+
+#rf_workflow_3 <- 
+#  workflow() %>%
+#  add_recipe(rf_recipe_1) %>%
+#  add_model(rf_model_3)
+
+#rf_res <- 
+#  rf_workflow_3 %>% 
+#  tune_grid(
+#    resamples = train_folds,grid = rf_grid
+#    )
+
+
+```
+
 
 ## Discussion of final model - Everyone
 
 o Discuss the selection of the final model used for generating predictions.\
 o Discussion of strengths and weaknesses of the model.\
 o Possible improvements, including what additional data could be usef
+
