@@ -1,0 +1,126 @@
+```{r}
+# Load packages
+library(tidyverse)
+library(tidymodels)
+library(tidyselect)
+library(recipes)
+library(caret)
+library(baguette)
+library(rpart)
+library(e1071)
+```
+
+```{r}
+# Load train and test data
+train <- read_csv('train.csv')
+test <- read_csv('test.csv')
+```
+
+# EDA (add later)
+
+# Preprocessing / Recipes
+
+```{r}
+# Remove non-numeric column ("id") and handle missing values
+numeric_vars <- train[, !names(train) %in% c("name", "id")]
+numeric_vars_na_omit <- na.omit(numeric_vars)  # Remove rows with missing values
+
+# Calculate the correlation matrix for numeric variables
+correlation_matrix <- cor(numeric_vars_na_omit)
+
+# Identify highly correlated variables
+highly_correlated <- findCorrelation(correlation_matrix, cutoff = 0.75)
+
+# Calculate skewness for each column in the dataframe df
+skew_values <- sapply(numeric_vars, skewness)
+
+# Set a threshold for skewness
+threshold <- 1.0
+
+# Get column names with high skewness
+high_skew_columns <- names(skew_values[abs(skew_values) > threshold])
+high_skew_columns <- as.character(high_skew_columns)
+high_skew_columns <- na.omit(high_skew_columns)
+```
+
+```{r}
+highly_correlated
+```
+
+```{r}
+high_skew_columns
+```
+
+```{r}
+final_recipe <- recipe(percent_dem ~ ., data = train) %>%
+  step_rm(id, name) %>%
+  step_log(all_of(high_skew_columns)) %>%
+  step_zv(all_predictors()) %>%
+  step_nzv(all_predictors()) %>%
+  step_impute_knn(all_predictors()) %>%
+  step_corr(all_predictors(), threshold = 0.75) %>%
+  step_normalize(all_numeric_predictors(), -all_outcomes()) %>%
+  step_dummy(all_nominal(), -all_outcomes())
+```
+
+```{r}
+final_recipe_prep <- prep(final_recipe, training = train)
+final_recipe_prep
+```
+
+```{r}
+train_baked <- bake(final_recipe_prep, new_data = train)
+```
+
+# Candidate models / Model evaluation / tuning
+
+```{r}
+set.seed(1)
+train_folds <- vfold_cv(train, v = 10, strata = percent_dem)
+```
+
+1.  Random forest
+
+```{r}
+random_forest_model <-
+  rand_forest() %>% 
+  set_mode("regression") %>% 
+  set_engine("ranger")
+
+random_forest_wf <-
+  workflow() %>% 
+  add_recipe(rf_recipe) %>% 
+  add_model(random_forest_model)
+
+random_forest_crossval_fit <-
+  random_forest_wf %>%
+  fit_resamples(resamples = train_folds, control = control_resamples(save_pred = TRUE))
+
+random_forest_crossval_fit %>% collect_metrics()
+```
+
+2.  
+
+```{r}
+
+```
+
+FINAL PREDICTION
+
+```{r}
+final_workflow <- 
+
+final_wf_fit <- final_workflow %>%
+fit(data = train)
+```
+
+```{r}
+test_res <- final_wf_fit %>% 
+  predict(test) %>%
+  cbind(test %>% select(id)) %>%
+  select(id, .pred)
+
+test_res <- test_res %>%
+  rename(percent_dem = .pred) %>%
+  write_csv("predictions.csv")
+```
