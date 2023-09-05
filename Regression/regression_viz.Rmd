@@ -38,7 +38,7 @@ racial_groups_tidy <- racial_groups_tidy %>%
 # Create the density ridgeline plot with outliers removed
 ggplot(racial_groups_tidy, aes(x = population, y = race, fill = race)) +
   geom_density_ridges() +
-  labs(x = "Population", y = "Racial group", title = "Disribution of sample racial groups (outliers removed)") +
+  labs(x = "Population", y = "Racial group", title = "Distribution of sample racial groups (outliers removed)") +
   theme(text = element_text(size = 11),
         plot.title = element_text(size = 12),
         axis.title.x = element_text(hjust = 0.5),
@@ -84,7 +84,7 @@ grid.arrange(hisp_lat, hisp_lat_log, ncol = 2)
 income_2020 <- ggplot(train, aes(x = income_per_cap_2020, y = percent_dem)) +
   geom_abline() +
   geom_point() +
-  labs(x = "Income per capita for the county in 2020", y = "Percent of voters who voted Biden", title = "Biden voters vs Income 2020") +
+  labs(x = "Income per capita for the county in 2020", y = "Percent of voters who voted Biden", title = "Income 2020 vs. Biden voters") +
   theme(text = element_text(size = 10),
         plot.title = element_text(size = 12))
 
@@ -92,7 +92,7 @@ income_2020 <- ggplot(train, aes(x = income_per_cap_2020, y = percent_dem)) +
 income_2020_log <- ggplot(train, aes(x = log10(income_per_cap_2020), y = percent_dem)) +
   geom_abline() +
   geom_point() +
-  labs(x = "Income per capita for the county in 2020 - log", y = "Percent of voters who voted Biden", title = "Biden voters vs Income 2020 - Log") +
+  labs(x = "Income per capita for the county in 2020 - log", y = "Percent of voters who voted Biden", title = "Log Income 2020 vs. Biden voters") +
   theme(text = element_text(size = 10),
         plot.title = element_text(size = 12))
 
@@ -104,7 +104,7 @@ grid.arrange(income_2020, income_2020_log, ncol = 2)
 ggplot(train, aes(x = log(income_per_cap_2020), y = percent_dem)) +
   geom_point() +
   facet_wrap(~x2013_code) +
-  labs(x = 'Income per capita for the county in 2020 (missing for some counties)', y = 'Percent voters who voted Biden', title = 'Biden voters vs Income per capita 2020 by urban/rural code') +
+  labs(x = 'Income per capita for the county in 2020 (missing for some counties)', y = 'Percent voters who voted Biden', title = 'Income 2020 vs. Biden voters by urban/rural code') +
   theme(text = element_text(size = 10),
         plot.title = element_text(size = 12))
 ```
