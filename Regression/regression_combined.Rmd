@@ -8,12 +8,17 @@ library(caret)
 library(baguette)
 library(rpart)
 library(e1071)
+library(stacks)
 ```
 
 ```{r}
 # Load train and test data
 train <- read_csv('train.csv')
 test <- read_csv('test.csv')
+
+# Cross-validation data
+set.seed(1)
+train_folds <- vfold_cv(train, v = 10, strata = percent_dem)
 ```
 
 # EDA (add later)
@@ -41,43 +46,66 @@ threshold <- 1.0
 high_skew_columns <- names(skew_values[abs(skew_values) > threshold])
 high_skew_columns <- as.character(high_skew_columns)
 high_skew_columns <- na.omit(high_skew_columns)
+
+
+# Remove "name" column from train
+train <- subset(train, select = -name)
 ```
 
 ```{r}
-highly_correlated
+# highly_correlated
 ```
 
 ```{r}
-high_skew_columns
+# high_skew_columns
 ```
 
 ```{r}
-final_recipe <- recipe(percent_dem ~ ., data = train) %>%
-  step_rm(id, name) %>%
-  step_log(all_of(high_skew_columns)) %>%
-  step_zv(all_predictors()) %>%
-  step_nzv(all_predictors()) %>%
-  step_impute_knn(all_predictors()) %>%
+# final_recipe <- recipe(percent_dem ~ ., data = train) %>%
+#   step_rm(id) %>%
+#   step_log(all_of(high_skew_columns)) %>%
+#   step_zv(all_predictors()) %>%
+#   step_nzv(all_predictors()) %>%
+#   step_impute_knn(all_predictors()) %>%
+#   step_corr(all_predictors(), threshold = 0.75) %>%
+#   step_normalize(all_numeric_predictors(), -all_outcomes()) %>%
+#   step_dummy(all_nominal(), -all_outcomes())
+
+basic_recipe <- 
+  recipe(percent_dem ~ ., data = train) %>%
+  step_rm(id) %>%
+  step_log(all_of(high_skew_columns), base = 10, offset = 0.001) %>%
+  step_impute_knn(all_predictors())
+
+normalized_recipe <-
+  basic_recipe %>%
+  step_normalize(all_numeric_predictors())
+
+interaction_recipe <-
+  normalized_recipe %>%
+  step_interact(terms = ~ income_per_cap_2016:x2013_code +
+                  income_per_cap_2017:x2013_code +
+                  income_per_cap_2018:x2013_code +
+                  income_per_cap_2019:x2013_code + 
+                  income_per_cap_2020:x2013_code)
+
+cor_var_recipe <-
+  interaction_recipe %>%
   step_corr(all_predictors(), threshold = 0.75) %>%
-  step_normalize(all_numeric_predictors(), -all_outcomes()) %>%
-  step_dummy(all_nominal(), -all_outcomes())
+  step_zv(all_predictors()) %>%
+  step_nzv(all_predictors())
 ```
 
 ```{r}
-final_recipe_prep <- prep(final_recipe, training = train)
-final_recipe_prep
+# final_recipe_prep <- prep(final_recipe, training = train)
+# final_recipe_prep
 ```
 
 ```{r}
-train_baked <- bake(final_recipe_prep, new_data = train)
+# train_baked <- bake(final_recipe_prep, new_data = train)
 ```
 
 # Candidate models / Model evaluation / tuning
-
-```{r}
-set.seed(1)
-train_folds <- vfold_cv(train, v = 10, strata = percent_dem)
-```
 
 1.  Random forest
 
@@ -87,40 +115,205 @@ random_forest_model <-
   set_mode("regression") %>% 
   set_engine("ranger")
 
-random_forest_wf <-
-  workflow() %>% 
-  add_recipe(rf_recipe) %>% 
-  add_model(random_forest_model)
-
-random_forest_crossval_fit <-
-  random_forest_wf %>%
-  fit_resamples(resamples = train_folds, control = control_resamples(save_pred = TRUE))
-
-random_forest_crossval_fit %>% collect_metrics()
+# random_forest_wf <-
+#   workflow() %>% 
+#   add_recipe(final_recipe) %>% 
+#   add_model(random_forest_model)
+# 
+# random_forest_crossval_fit <-
+#   random_forest_wf %>%
+#   fit_resamples(resamples = train_folds, control = control_resamples(save_pred = TRUE))
+# 
+# random_forest_crossval_fit %>% collect_metrics()
 ```
 
-2.  
+2.  Linear Regression
 
 ```{r}
+linear_regression_model <- 
+  linear_reg() %>%
+  set_engine("lm")
 
+# linear_regression_wf <- 
+#   workflow() %>%
+#   add_model(linear_regression_model) %>%
+#   add_recipe(final_recipe)
+# 
+# linear_regression_crossval_fit <-
+#   linear_regression_wf %>%
+#   fit_resamples(resamples = train_folds, control = control_resamples(save_pred = TRUE, save_workflow = TRUE))
+# 
+# linear_regression_crossval_fit %>% collect_metrics()
 ```
 
+3.  Bayesian additive regression trees
+
+```{r}
+bart_model <-
+  bart(
+  trees = integer(1),
+  prior_terminal_node_coef = double(1),
+  prior_terminal_node_expo = double(1),
+  prior_outcome_range = double(1)
+  ) %>% 
+  set_engine("dbarts") %>% 
+  set_mode("regression")
+```
+
+4.  Boosted trees
+
+```{r}
+boosted_tree_model <- 
+  boost_tree(
+  mode = "regression",
+  engine = "xgboost",
+  mtry = NULL,
+  trees = NULL,
+  min_n = NULL,
+  tree_depth = NULL,
+  learn_rate = NULL,
+  loss_reduction = NULL,
+  sample_size = NULL,
+  stop_iter = NULL
+)
+```
+
+Workflow sets (recipes x models)
+
+```{r}
+preproc <-
+  list(basic = basic_recipe,
+       normal = normalized_recipe,
+       interact = interaction_recipe,
+       cor_var = cor_var_recipe)
+
+keep_pred <- control_resamples(save_pred = TRUE, save_workflow = TRUE)
+```
+
+```{r}
+rf_models <- workflow_set(preproc = preproc,
+                          models = list(rf = random_forest_model),
+                          cross = FALSE)
+
+rf_models <- 
+  rf_models %>%
+  workflow_map("fit_resamples",
+               # Options to `workflow_map()`:
+               seed = 1, verbose = TRUE,
+               # Options to `fit_resamples()`:
+               resamples = train_folds, control = keep_pred)
+```
+
+```{r}
+lm_models <- workflow_set(preproc = preproc,
+                          models = list(lm = linear_regression_model),
+                          cross = FALSE)
+
+lm_models <- 
+  lm_models %>%
+  workflow_map("fit_resamples",
+               # Options to `workflow_map()`:
+               seed = 1, verbose = TRUE,
+               # Options to `fit_resamples()`:
+               resamples = train_folds, control = keep_pred)
+```
+
+```{r}
+bt_models <- workflow_set(preproc = preproc,
+                                    models = list(bt = boosted_tree_model),
+                                    cross = FALSE)
+
+bt_models <- 
+  bt_models %>%
+  workflow_map("fit_resamples",
+               # Options to `workflow_map()`:
+               seed = 1, verbose = TRUE,
+               # Options to `fit_resamples()`:
+               resamples = train_folds, control = keep_pred)
+```
+
+```{r}
+rf_models %>%
+  collect_metrics()
+
+lm_models %>%
+  collect_metrics()
+
+bt_models %>%
+  collect_metrics()
+```
+
+```{r}
+all_wf_set <- 
+  workflow_set(
+    preproc = list(rec1 = basic_recipe,         rec2 = normalized_recipe,             rec3 = basic_recipe),
+    models = list(rf = random_forest_model, lm = linear_regression_model, bt = boosted_tree_model),
+    cross = FALSE
+  )
+
+metric <- metric_set(rmse)
+
+all_wf_set <-
+  all_wf_set %>%
+  option_add(
+    control = control_stack_grid(),
+    metrics = metric
+  )
+
+all_wf_set_trained <-
+  workflow_map(
+    all_wf_set,
+    fn = "tune_grid",
+    resamples = train_folds
+  )
+```
+
+```{r}
+all_wf_set_trained
+```
+
+```{r}
+stacked_model <- 
+  # initialize the stack
+  stacks() %>%
+  # add candidate members
+  add_candidates(all_wf_set_trained) %>%
+  # determine how to combine their predictions
+  blend_predictions() %>%
+  # fit the candidates with nonzero stacking coefficients
+  fit_members()
+```
+
+```{r}
+stacked_model
+```
+
+```{r}
+autoplot(stacked_model)
+```
+
+```{r}
+autoplot(stacked_model, type = "weights")
+```
+
+\
 FINAL PREDICTION
 
 ```{r}
-final_workflow <- 
-
-final_wf_fit <- final_workflow %>%
-fit(data = train)
-```
-
-```{r}
-test_res <- final_wf_fit %>% 
+test_res_stacked <- 
+  stacked_model %>% 
   predict(test) %>%
   cbind(test %>% select(id)) %>%
   select(id, .pred)
+```
 
-test_res <- test_res %>%
-  rename(percent_dem = .pred) %>%
-  write_csv("predictions.csv")
+```{r}
+print(head(test_res_stacked, n = 15))
+```
+
+```{r}
+test_res_stacked <- 
+  test_res_stacked %>% 
+  rename(percent_dem = .pred) %>% 
+  write_csv("stacked_predictions.csv")
 ```
