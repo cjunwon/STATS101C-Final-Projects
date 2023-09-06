@@ -1,0 +1,71 @@
+```{r}
+library(tidyverse)
+library(recipes)
+library(tidymodels)
+
+```
+
+```{r}
+test <- read_csv("test.csv")
+train <- read_csv('train.csv')
+train <- subset(train, select = c(-id, -name))
+```
+
+
+My notes for Samantha:
+
+- 1) Dropping below 4th percentile and above 96th percentile on all numeric columns arbitrarily is bad. Deal with outliers differently.
+- 2) total_votes should be dropped or dealt with somehow to avoid data leakage (can cause overfitting), or at the bare minimum its effects should be explored.
+- 3) Ignore colinearity or deal with it differently (for Random Forrest)
+- 4) Significant near duplicate columns or redundant columns (colinear yes but worse). Choose which ones to keep and which to simply drop.
+- 5) Consider using CO1_001E - C01_027E to feature engineer education level columns (feature engineering).
+- 6) Consider using gdp and income per capita column for 2016 to 2020 to feature engineer trend columns for increase or decrease from 2016-2020 (feature engineering).
+
+
+```{r}
+education_cols = c("c01_003e" , "c01_004e", "c01_005e","c01_006e" , "c01_007e", "c01_008e"  ,"c01_009e" , "c01_010e","c01_011e" ,"c01_012e" ,"c01_013e" , "c01_014e","c01_015e", "c01_016e", "c01_017e",                           "c01_018e" ,"c01_019e", "c01_020e" , "c01_021e", "c01_022e", "c01_023e", "c01_024e", "c01_025e", "c01_026e", "c01_027e")
+
+cols_to_drop_1 = c("x0001e", "x0018e","x0019e", "x0020e", "x0021e", "x0022e", "x0023e","x0024e" , "x0025e", "x0026e", "x0027e", "x0029e", "x0030e", "x0031e",  "x0034e", "x0058e", "x0062e", "x0064e", "x0065e",                     "x0066e", "x0067e", "x0068e", "x0069e", "x0076e" , "x0077e", "x0078e",  "x0079e", "x0080e", "x0081e", "x0082e", "x0083e")
+```
+
+
+```{r}
+#First aging scheme: Kept total columns: No education feature: No Colinearity Adjustment: No Normalization
+rf_recipe_1 <- recipe(percent_dem ~ ., data = train) %>%
+  step_rm(all_of(c(education_cols, cols_to_drop_1))) %>%
+  step_zv(all_predictors()) %>%
+  step_impute_knn(all_predictors())
+
+rf_recipe_prep_1 <- prep(rf_recipe_1, training = train)
+rf_train_baked_1 <- bake(rf_recipe_prep_1, new_data = train)
+```
+
+```{r}
+#model
+rf_model <- rand_forest(trees = 1000) %>% 
+            set_engine("ranger", importance = "impurity")  %>% 
+            set_mode("regression")
+```
+
+```{r}
+#workflow
+rf_workflow <- 
+  workflow() %>%
+  add_recipe(rf_recipe_1) %>%
+  add_model(rf_model)
+```
+
+```{r}
+#cross_validation definition
+set.seed(1)
+train_folds <- train %>% vfold_cv(v = 10, strata = 'percent_dem')
+```
+
+```{r}
+rf_crossval_fit_1 <- 
+  rf_workflow %>%
+  fit_resamples(train_folds)
+
+rf_crossval_fit_1 %>% 
+  collect_metrics()
+```
