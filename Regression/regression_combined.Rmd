@@ -65,7 +65,7 @@ ggplot(racial_groups_tidy, aes(x = population, y = race, fill = race)) +
         axis.title.x = element_text(hjust = 0.5),
         axis.title.y = element_text(hjust = 0.5)) +
   scale_y_discrete(name = "Racial Group",
-                       labels = c("One race", "Two or more races", "White", "Black or African American", "American Indian and Alaska Native", "Asian", "Other Asian")) +
+                   labels = c("One race", "Two or more races", "White", "Black or African American", "American Indian and Alaska Native", "Asian", "Other Asian")) +
   guides(fill = "none")
 ```
 
@@ -73,7 +73,7 @@ ggplot(racial_groups_tidy, aes(x = population, y = race, fill = race)) +
 # Box plot for the relationship between total votes and percent_Dem
 ggplot(train, aes(x = as_factor(x2013_code), y = percent_dem)) +
   geom_boxplot(fill = rainbow(6)) +
-  labs(x = "urban/rural code used by CDC (1 is most urban 6 is most rural)", y = "Percent of voters who voted Biden", title = "Distribution of Percent of Biden Voters by Urban/Rural Code") +
+  labs(x = "Urban/Rural code used by CDC (1 is most urban 6 is most rural)", y = "Percent of voters who voted Biden", title = "Distribution of Percent of Biden Voters by Urban/Rural Code") +
   theme(text = element_text(size = 12),
         plot.title = element_text(size = 13))
 ```
@@ -109,7 +109,7 @@ income_2020 <- ggplot(train, aes(x = income_per_cap_2020, y = percent_dem)) +
   theme(text = element_text(size = 10),
         plot.title = element_text(size = 12))
 
-### scatter plot for relationship between income_per_cap_2020 and percent_dem
+# scatter plot for relationship between income_per_cap_2020 and percent_dem
 income_2020_log <- ggplot(train, aes(x = log10(income_per_cap_2020), y = percent_dem)) +
   geom_abline() +
   geom_point() +
@@ -117,6 +117,7 @@ income_2020_log <- ggplot(train, aes(x = log10(income_per_cap_2020), y = percent
   theme(text = element_text(size = 10),
         plot.title = element_text(size = 12))
 
+# Combine above two
 grid.arrange(income_2020, income_2020_log, ncol = 2)
 ```
 
@@ -171,6 +172,7 @@ education_levels_log <- ggplot(education_tidy_log, aes(x = population, y = perce
   theme(text = element_text(size = 8),
         plot.title = element_text(size = 12))
 
+# Combine above two
 grid.arrange(education_levels, education_levels_log, ncol = 1)
 ```
 
@@ -195,6 +197,7 @@ low_high_ed <- ggplot(train, aes(x = log(c01_007e), y = log(c01_013e))) +
   labs(x = "Less than 9th grade", y = "Graduate or professional degree", title = "Less than 9th vs Graduate or Prof - Log") +
   theme(text = element_text(size = 8))
 
+# Combine above three
 grid.arrange(lower_ed, higher_ed, low_high_ed, ncol = 2, nrow = 2)
 ```
 
@@ -237,6 +240,7 @@ gdp_plot_log <- ggplot(gdp_tidy_log, aes(x = GDP, y = percent_dem, color = Year)
   theme(text = element_text(size = 8),
         plot.title = element_text(size = 12))
 
+# Combine above two
 grid.arrange(gdp_plot, gdp_plot_log, ncol = 1)
 ```
 
@@ -274,16 +278,20 @@ train <- subset(train, select = -name)
 ```
 
 ```{r}
+# Create all recipes
+
 basic_recipe <- 
   recipe(percent_dem ~ ., data = train) %>%
   step_rm(id) %>%
   step_log(all_of(high_skew_columns), base = 10, offset = 0.001) %>%
   step_impute_knn(all_predictors())
 
+# Add normalization step
 normalized_recipe <-
   basic_recipe %>%
   step_normalize(all_numeric_predictors())
 
+# Add interaction columns
 interaction_recipe <-
   normalized_recipe %>%
   step_interact(terms = ~ income_per_cap_2016:x2013_code +
@@ -292,14 +300,15 @@ interaction_recipe <-
                   income_per_cap_2019:x2013_code + 
                   income_per_cap_2020:x2013_code)
 
+# Account for correlation/collinearity and zero/low variance columns
 cor_var_recipe <-
   interaction_recipe %>%
   step_corr(all_predictors(), threshold = 0.75) %>%
   step_zv(all_predictors()) %>%
   step_nzv(all_predictors())
 
+# Create custom recipe with multiple new columns calculating percentages of different groups based on total population
 
-#First aging scheme: Kept total columns: No education feature: No Colinearity Adjustment: No Normalization
 code2013 <- c("one", "two", "three", "four", "five", "six")
 
 custom_recipe <- recipe(percent_dem ~ ., data = train) %>%
@@ -394,12 +403,9 @@ custom_recipe <- recipe(percent_dem ~ ., data = train) %>%
   step_mutate(mean_gdp = (gdp_2016+ gdp_2017+ gdp_2018 + gdp_2019+ gdp_2020)/5) %>%
   step_mutate(pc_vote_population = total_votes / x0001e) %>%
   step_mutate(pc_vote_eligible = total_votes/x0087e) %>%
-  #step_mutate(housing_unit_per_person = x0086e / x0001e)  %>%
   step_rm(x0002e, x0009e, x0010e, x0003e, x0005e, x0006e, x0007e, x0008e, x0033e, x0011e, x0012e, x0013e, x0014e, x0015e, x0016e, x0017e) %>%
   step_rm(x0020e, x0021e, x0022e, x0023e, x0024e, x0025e, x0029e, x0087e, x0088e, x0089e) %>% #age
   step_rm(x0034e, x0035e, x0036e, x0037e, x0038e, x0039e, x0040e, x0052e, x0044e,x0057e, x0058e, x0064e, x0065e,x0066e, x0067e, x0068e, x0069e, x0071e) %>% #race
-  #step_rm(income_per_cap_2016, income_per_cap_2018, income_per_cap_2017, income_per_cap_2019, income_per_cap_2020) %>%
-  #step_rm(gdp_2016, gdp_2017, gdp_2018, gdp_2019, gdp_2020) %>%
   step_rm(c01_002e, c01_015e,c01_011e,c01_010e, c01_009e, c01_008e, c01_007e,  c01_005e, c01_004e, c01_003e) %>% 
   step_rm(c01_017e, c01_018e, c01_019e, c01_020e, c01_021e, c01_022e, c01_023e, c01_024e, c01_025e, c01_026e, c01_027e)%>% 
   step_rm(x0041e, x0042e, x0043e, x0045e, x0046e, x0047e, x0048e, x0049e, x0050e, x0051e, x0053e, x0054e, x0055e, x0056e) %>% 
@@ -408,12 +414,8 @@ custom_recipe <- recipe(percent_dem ~ ., data = train) %>%
   step_rm(c01_001e, c01_006e, c01_012e, c01_013e, c01_016e)%>%
   step_rm(c01_014e)%>%
   step_rm(total_votes) %>%
-  #step_rm(x0086e) %>%
- # step_corr(all_predictors(), threshold = 0.99) %>%
   step_num2factor(x2013_code, levels = code2013) %>%
   step_dummy(x2013_code) %>%
-  #step_scale(all_predictors()) %>%
- # step_normalize(all_predictors()) %>%
   step_zv(all_predictors())
 ```
 
@@ -422,6 +424,10 @@ custom_recipe <- recipe(percent_dem ~ ., data = train) %>%
 1.  Linear Regression (baseline testing for recipes)
 
 ```{r}
+# Initialize candidate models for testing
+
+# Linear Regression (baseline testing for selecting best recipe)
+
 linear_regression_spec <- 
   linear_reg() %>%
   set_engine("lm")
@@ -430,6 +436,8 @@ linear_regression_spec <-
 2.  Random forest
 
 ```{r}
+# Random forest (basic)
+
 random_forest_spec <-
   rand_forest(trees = 100) %>% 
   set_mode("regression") %>% 
@@ -439,6 +447,8 @@ random_forest_spec <-
 3.  K-nearest neighbors
 
 ```{r}
+# K-nearest neighbors
+
 knn_spec <-
   nearest_neighbor(
     mode = "regression", 
@@ -450,6 +460,8 @@ knn_spec <-
 4.  Support vector machine
 
 ```{r}
+# Support vector machine
+
 svm_spec <- 
   svm_rbf(
     cost = tune("cost"), 
@@ -462,6 +474,8 @@ svm_spec <-
 5.  Boosted trees - xgboost engine
 
 ```{r}
+# Boosted trees - xgboost engine
+
 bt_xgboost_spec <- 
   boost_tree(
   mode = "regression", 
@@ -479,6 +493,8 @@ bt_xgboost_spec <-
 6.  Boosted trees - lightgbm engine
 
 ```{r}
+# Boosted trees - lightgbm engine
+
 bt_lightgbm_spec <- 
   boost_tree(
   mode = "regression", 
@@ -498,6 +514,7 @@ Workflow sets (recipes x models)
 ```{r}
 # Run this part to select ideal recipe (baseline)
 
+# Set up preprocess object containing all candidate recipes
 preproc <- list(basic = basic_recipe,
                 normal = normalized_recipe,
                 interact = interaction_recipe,
@@ -508,10 +525,13 @@ keep_pred <- control_resamples(save_pred = TRUE, save_workflow = TRUE)
 ```
 
 ```{r}
+
+# Create a workflow_set to test all candidate recipes against baseline linear regression model
 lm_models <- workflow_set(preproc = preproc,
                           models = list(lm =  linear_regression_spec),
                           cross = FALSE)
 
+# Use workflow_map to call in v-fold cross validation data
 lm_models <- 
   lm_models %>%
   workflow_map("fit_resamples",
@@ -522,14 +542,19 @@ lm_models <-
 ```
 
 ```{r}
-# This shows that our custom recipe performs best
+# This shows that the custom recipe performs best
 
 lm_models %>%
-  collect_metrics()
+  collect_metrics() %>%
+  filter(.metric == "rmse")
 ```
 
 ```{r}
-# Random forest individual
+autoplot(lm_models)
+```
+
+```{r}
+# Random forest individual fit
 
 rf_workflow <- 
   workflow() %>% 
@@ -544,11 +569,12 @@ rf_res <-
 
 ```{r}
 rf_res %>%
-  collect_metrics()
+  collect_metrics() %>%
+  filter(.metric == "rmse")
 ```
 
 ```{r}
-# KNN individual
+# KNN individual fit
 
 knn_wflow <- 
   workflow() %>% 
@@ -570,7 +596,11 @@ show_best(knn_res, metric = "rmse")
 ```
 
 ```{r}
-# SVM individual
+autoplot(knn_res)
+```
+
+```{r}
+# SVM individual fit
 
 svm_wflow <- 
   workflow() %>% 
@@ -592,7 +622,11 @@ show_best(svm_res, metric = "rmse")
 ```
 
 ```{r}
-# Boosted trees - xgboost
+autoplot(svm_res)
+```
+
+```{r}
+# Boosted trees - xgboost fit
 
 bt_xgboost_workflow <- workflow() %>% 
   add_model(bt_xgboost_spec) %>% 
@@ -622,6 +656,12 @@ show_best(bt_xgboost_res, metric = "rmse")
 ```
 
 ```{r}
+autoplot(bt_xgboost_res)
+```
+
+```{r}
+# Boosted trees - lightgbm fit
+
 bt_light_workflow <- workflow() %>% 
   add_model(bt_lightgbm_spec) %>% 
   add_recipe(custom_recipe)
@@ -641,8 +681,13 @@ show_best(bt_light_res, metric = "rmse")
 ```
 
 ```{r}
-# Test stack
+autoplot(bt_light_res)
+```
 
+```{r}
+# Stacked model
+
+# Define stack object adding the top four candidate models
 test_stack <- 
   stacks() %>%
   add_candidates(knn_res) %>%
@@ -664,12 +709,17 @@ autoplot(test_stack, type = "weights")
 ```
 
 ```{r}
+
+# Fit the models based on evaluation of the stack function
 test_stack <-
   test_stack %>%
   fit_members()
 ```
 
 ```{r}
+
+# Generate final predictions
+
 test_res_stacked <- 
   test_stack %>% 
   predict(test) %>%
