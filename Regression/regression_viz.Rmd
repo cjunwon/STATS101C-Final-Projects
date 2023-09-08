@@ -52,7 +52,7 @@ ggplot(racial_groups_tidy, aes(x = population, y = race, fill = race)) +
 # Box plot for the relationship between total votes and percent_Dem
 ggplot(train, aes(x = as_factor(x2013_code), y = percent_dem)) +
   geom_boxplot(fill = rainbow(6)) +
-  labs(x = "urban/rural code used by CDC (1 is most urban 6 is most rural)", y = "Percent of voters who voted Biden", title = "Distribution of Percent of Biden Voters by Urban/Rural Code") +
+  labs(x = "Urban/Rural code used by CDC (1 is most urban 6 is most rural)", y = "Percent of voters who voted Biden", title = "Distribution of Percent of Biden Voters by Urban/Rural Code") +
   theme(text = element_text(size = 12),
         plot.title = element_text(size = 13))
 ```
