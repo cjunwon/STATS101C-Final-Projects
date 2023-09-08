@@ -1,0 +1,30 @@
+---
+title: "candidate_model"
+output: pdf_document
+date: "2023-09-08"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(knitr)
+```
+
+```{r}
+candidate_models <- data.frame(
+  Model_Identifier = c("Model 1", "Model 2", "Model 3", "Model 4", "Model 5", "Model 6"),
+  Type_of_Model = c("Linear Regression", "Random forest", "K-Nearest neighbors", "Support Vector Machine", "Boosted Trees - Xgboost Engine", "Boosted trees - Lightgbm Engine"),
+  Engine = c("lm (R base)", "ranger (R package)", "kknn (R package)", "kernlab (R package)", "xgboost (R package)", "lightgbm (R package)"),
+  Recipe_Variables = c("Features: X1, X2, X3", "Features: X1, X2, X3", "Features: X1, X2, X3", "Features: X1, X2, X3", "Features: X1, X2, X3", "Features: X1, X2, X3"),
+  Hyperparameters = c("None", "trees = 100, importance = 'impurity'", "mode = 'regression', neighbors = tune('k')", "cost = tune('cost'), rbf_sigma = tune('sigma')", 
+                      "mode = 'regression', trees = 100, learn_rate = 0.05, tree_depth = tune('tree_depth'), mtry = tune('mtry'), min_n = tune('min_n'), loss_reduction = tune('loss_red')", "mode = 'regression', trees = 100, learn_rate = 0.05, tree_depth = tune('tree_depth'), mtry = tune('mtry'), min_n = tune('min_n'), loss_reduction = tune('loss_red')")
+)
+
+candidate_models
+
+kable(candidate_models)
+
+write.csv(candidate_models, "candidate_models.csv", row.names = FALSE)
+```
