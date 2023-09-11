@@ -1,0 +1,112 @@
+---
+title: "stats101c_final_classification"
+output: html_document
+date: "2023-09-11"
+---
+
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(tidyselect)
+library(recipes)
+```
+
+
+```{r}
+train2 <- read_csv("train2.csv")
+train2 <- read_csv("train2.csv", guess_max = nrow(train2))
+```
+
+
+```{r}
+## recipe
+recipe_2 <- recipe(action_taken~. , data = train2) %>%
+    step_rm(total_points_and_fees, prepayment_penalty_term , introductory_rate_period, automated_underwriting_system_2, automated_underwriting_system_4, automated_underwriting_system_3, automated_underwriting_system_5, multifamily_affordable_units)%>%
+  step_rm(id)  %>%
+  ## race
+  step_mutate(race_of_co_applicant_or_co_borrower_2 = ifelse(is.na(race_of_co_applicant_or_co_borrower_2), 0, race_of_co_applicant_or_co_borrower_2)) %>%
+  step_mutate(race_of_co_applicant_or_co_borrower_1 = ifelse(is.na(race_of_co_applicant_or_co_borrower_1), 0, race_of_co_applicant_or_co_borrower_1)) %>%
+  step_mutate(race_of_co_applicant_or_co_borrower_3 = ifelse(is.na(race_of_co_applicant_or_co_borrower_3), 0, race_of_co_applicant_or_co_borrower_3)) %>%
+  step_mutate(race_of_co_applicant_or_co_borrower_4 = ifelse(is.na(race_of_co_applicant_or_co_borrower_4), 0, race_of_co_applicant_or_co_borrower_4)) %>%
+  step_mutate(race_of_co_applicant_or_co_borrower_5 = ifelse(is.na(race_of_co_applicant_or_co_borrower_5), 0, race_of_co_applicant_or_co_borrower_5)) %>%
+  step_mutate(race_of_co_applicant_or_co_borrower_4 = factor(race_of_co_applicant_or_co_borrower_4)) %>%
+  step_mutate(race_of_co_applicant_or_co_borrower_3 = factor(race_of_co_applicant_or_co_borrower_3)) %>%
+  step_mutate(race_of_co_applicant_or_co_borrower_2 = factor(race_of_co_applicant_or_co_borrower_2))%>%
+  step_mutate(race_of_co_applicant_or_co_borrower_1 = factor(race_of_co_applicant_or_co_borrower_1)) %>%
+  step_mutate(race_of_co_applicant_or_co_borrower_5 = factor(race_of_co_applicant_or_co_borrower_5)) %>%
+  step_mutate(race_of_applicant_or_borrower_1 = ifelse(is.na(race_of_applicant_or_borrower_1), 0, race_of_applicant_or_borrower_1)) %>%
+  step_mutate(race_of_applicant_or_borrower_1 = factor(race_of_applicant_or_borrower_1)) %>%
+  step_mutate(race_of_applicant_or_borrower_2 = ifelse(is.na(race_of_applicant_or_borrower_2), 0, race_of_applicant_or_borrower_2)) %>%
+  step_mutate(race_of_applicant_or_borrower_2 = factor(race_of_applicant_or_borrower_2)) %>%
+  step_mutate(race_of_applicant_or_borrower_3 = ifelse(is.na(race_of_applicant_or_borrower_3), 0, race_of_applicant_or_borrower_3)) %>%
+  step_mutate(race_of_applicant_or_borrower_3 = factor(race_of_applicant_or_borrower_3)) %>%
+  step_mutate(race_of_applicant_or_borrower_4 = ifelse(is.na(race_of_applicant_or_borrower_4), 0, race_of_applicant_or_borrower_4)) %>%
+  step_mutate(race_of_applicant_or_borrower_4 = factor(race_of_applicant_or_borrower_4)) %>%
+  step_mutate(race_of_applicant_or_borrower_5 = ifelse(is.na(race_of_applicant_or_borrower_5), 0, race_of_applicant_or_borrower_5)) %>%
+  step_mutate(race_of_applicant_or_borrower_5 = factor(race_of_applicant_or_borrower_5)) %>%
+  ## ethnicity
+  step_mutate(ethnicity_of_applicant_or_borrower_1 = ifelse(is.na(ethnicity_of_applicant_or_borrower_1), 0, ethnicity_of_applicant_or_borrower_1)) %>%
+  step_mutate(ethnicity_of_applicant_or_borrower_1 = factor(ethnicity_of_applicant_or_borrower_1)) %>%
+  step_mutate(ethnicity_of_applicant_or_borrower_2 = ifelse(is.na(ethnicity_of_applicant_or_borrower_2), 0, ethnicity_of_applicant_or_borrower_2)) %>%
+  step_mutate(ethnicity_of_applicant_or_borrower_2 = factor(ethnicity_of_applicant_or_borrower_2)) %>%
+  step_mutate(ethnicity_of_applicant_or_borrower_3 = ifelse(is.na(ethnicity_of_applicant_or_borrower_3), 0, ethnicity_of_applicant_or_borrower_3)) %>%
+  step_mutate(ethnicity_of_applicant_or_borrower_3 = factor(ethnicity_of_applicant_or_borrower_3)) %>%
+  step_mutate(ethnicity_of_applicant_or_borrower_4 = ifelse(is.na(ethnicity_of_applicant_or_borrower_4), 0, ethnicity_of_applicant_or_borrower_4)) %>%
+  step_mutate(ethnicity_of_applicant_or_borrower_4 = factor(ethnicity_of_applicant_or_borrower_4)) %>%
+  step_mutate(ethnicity_of_applicant_or_borrower_5 = ifelse(is.na(ethnicity_of_applicant_or_borrower_5), 0, ethnicity_of_applicant_or_borrower_5)) %>%
+  step_mutate(ethnicity_of_applicant_or_borrower_5 = factor(ethnicity_of_applicant_or_borrower_5)) %>%
+  step_mutate(ethnicity_of_co_applicant_or_co_borrower_1 = ifelse(is.na(ethnicity_of_co_applicant_or_co_borrower_1), 0, ethnicity_of_co_applicant_or_co_borrower_1)) %>%
+  step_mutate(ethnicity_of_co_applicant_or_co_borrower_1 = factor(ethnicity_of_co_applicant_or_co_borrower_1)) %>%
+  step_mutate(ethnicity_of_co_applicant_or_co_borrower_2 = ifelse(is.na(ethnicity_of_co_applicant_or_co_borrower_2), 0, ethnicity_of_co_applicant_or_co_borrower_2)) %>%
+  step_mutate(ethnicity_of_co_applicant_or_co_borrower_2 = factor(ethnicity_of_co_applicant_or_co_borrower_2)) %>%
+  step_mutate(ethnicity_of_co_applicant_or_co_borrower_3 = ifelse(is.na(ethnicity_of_co_applicant_or_co_borrower_3), 0, ethnicity_of_co_applicant_or_co_borrower_3)) %>%
+  step_mutate(ethnicity_of_co_applicant_or_co_borrower_3 = factor(ethnicity_of_co_applicant_or_co_borrower_3)) %>%
+  step_mutate(ethnicity_of_co_applicant_or_co_borrower_4 = ifelse(is.na(ethnicity_of_co_applicant_or_co_borrower_4), 0, ethnicity_of_co_applicant_or_co_borrower_4)) %>%
+  step_mutate(ethnicity_of_co_applicant_or_co_borrower_4 = factor(ethnicity_of_co_applicant_or_co_borrower_4)) %>%
+  step_mutate(ethnicity_of_co_applicant_or_co_borrower_5 = ifelse(is.na(ethnicity_of_co_applicant_or_co_borrower_5), 0, ethnicity_of_co_applicant_or_co_borrower_5)) %>%
+  step_mutate(ethnicity_of_co_applicant_or_co_borrower_5 = factor(ethnicity_of_co_applicant_or_co_borrower_5)) %>%
+  
+  
+  #step_mutate(introductory_rate_period = ifelse(is.na(introductory_rate_period), 0, introductory_rate_period)) %>%
+  #step_mutate(introductory_rate_period = factor(introductory_rate_period)) %>%
+  
+  step_zv(all_predictors()) %>%
+  step_impute_mean(combined_loan_to_value_ratio, loan_term) %>%
+  step_impute_mode(state) %>%
+  step_impute_mode(age_of_applicant_62, age_of_co_applicant_62) %>%
+  step_impute_mean(property_value, income) %>% 
+  step_mutate(manufactured_home_secured_property_type = factor(manufactured_home_secured_property_type), manufactured_home_land_property_interest = factor(manufactured_home_land_property_interest)) %>%
+  step_mutate(loan_type = factor(loan_type), occupancy_type = factor(occupancy_type)) %>%
+  step_mutate(ethnicity_of_applicant_or_borrower_collected_on_the_basis_of_visual_observation_or_surname =     factor(ethnicity_of_applicant_or_borrower_collected_on_the_basis_of_visual_observation_or_surname),
+              ethnicity_of_co_applicant_or_co_borrower_collected_on_the_basis_of_visual_observation_or_surname =         factor(ethnicity_of_co_applicant_or_co_borrower_collected_on_the_basis_of_visual_observation_or_surname)) %>%
+  step_mutate(construction_method = factor(construction_method), construction_type = factor(construction_method), loan_purpose = factor(loan_purpose)) %>%
+  step_mutate(race_of_applicant_or_borrower_collected_on_the_basis_of_visual_observation_or_surname = factor(race_of_applicant_or_borrower_collected_on_the_basis_of_visual_observation_or_surname), 
+              race_of_co_applicant_or_co_borrower_collected_on_the_basis_of_visual_observation_or_surname = factor(race_of_co_applicant_or_co_borrower_collected_on_the_basis_of_visual_observation_or_surname)) %>%
+  step_string2factor(all_nominal_predictors()) %>%
+  step_dummy(all_factor_predictors()) 
+  
+```
+
+
+
+```{r}
+set.seed(10)
+train_folds <- train2 %>% vfold_cv(v = 3)
+```
+
+```{r}
+logistic_model <- logistic_reg(penalty = 0.01) %>%
+                set_engine("glmnet")
+
+workflow <- 
+  workflow() %>%
+  add_recipe(recipe_2) %>%
+  add_model(logistic_model)
+
+crossval_fit_1 <- 
+  workflow %>%
+  fit_resamples(train_folds)
+
+
+```
