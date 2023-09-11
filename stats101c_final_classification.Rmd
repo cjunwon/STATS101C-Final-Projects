@@ -20,6 +20,7 @@ train2 <- read_csv("train2.csv", guess_max = nrow(train2))
 
 
 ```{r}
+train2$action_taken <- factor(train2$action_taken)
 ## recipe
 recipe_2 <- recipe(action_taken~. , data = train2) %>%
     step_rm(total_points_and_fees, prepayment_penalty_term , introductory_rate_period, automated_underwriting_system_2, automated_underwriting_system_4, automated_underwriting_system_3, automated_underwriting_system_5, multifamily_affordable_units)%>%
