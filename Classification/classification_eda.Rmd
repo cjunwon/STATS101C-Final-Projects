@@ -1,0 +1,73 @@
+---
+title: "classification_eda"
+output: pdf_document
+date: "2023-09-10"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(tidyselect)
+library(ggplot2)
+library(dplyr)
+```
+
+```{r}
+train2 <- read_csv("train2.csv")
+head(train2)
+test2 <- read_csv("test2.csv")
+head(test2)
+```
+
+## EDA
+
+```{r}
+#the relationship between race applicant and action_taken
+ggplot(train2, aes(x = as.factor(race_of_applicant_or_borrower_1), color = as.factor(action_taken))) +
+  geom_bar(position = "dodge") +
+  labs(
+    title = "Relationship between Race and Action Taken",
+    x = "Race of Applicant",
+    y = "Count"
+  ) 
+```
+
+```{r}
+
+interaction_table <- table(train2$loan_purpose, train2$loan_type)
+
+# Convert the table to a data frame
+interaction_df <- as.data.frame(interaction_table)
+
+# Rename the columns for clarity
+colnames(interaction_df) <- c("Loan_Purpose", "Loan_Type", "Count")
+interaction_df
+
+ggplot(interaction_df, aes(x = Loan_Purpose, y = Count, fill = Loan_Type)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Interaction between Loan Purpose and Loan Type",
+       x = "Loan Purpose",
+       y = "Count")
+```
+
+```{r}
+#the relationship between income and action_taken
+ggplot(train2, aes(x = as.factor(action_taken), y = income)) +
+  geom_boxplot() +
+  labs(x = "action_taken", y = "income", title = "Relationship between income and action_taken") +
+  theme(text = element_text(size = 12),
+        plot.title = element_text(size = 13))
+
+#log10
+ggplot(train2, aes(x = as.factor(action_taken), y = log10(income), color = as.factor(action_taken))) +
+  geom_boxplot() +
+  labs(x = "action_taken", y = "log10(income)", title = "Relationship between log-transformed income and action_taken") +
+  theme(text = element_text(size = 12),
+        plot.title = element_text(size = 13))
+
+
+```
