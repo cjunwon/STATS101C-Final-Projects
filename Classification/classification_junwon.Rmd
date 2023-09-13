@@ -101,13 +101,6 @@ na_cols_count_high <-
 no_na_cols <- pull(no_na_cols_count, Column)
 na_cols <- pull(na_cols_count, Column)
 na_cols_high <- pull(na_cols_count_high, Column)
-
-# Change outcome variable into factor
-train$action_taken <- as_factor(train$action_taken)
-
-# Cross-validation data
-set.seed(1)
-train_folds <- vfold_cv(train, v = 10, strata = action_taken)
 ```
 
 ```{r}
@@ -117,12 +110,81 @@ na_cols_high
 ```
 
 ```{r}
+# Change outcome variable into factor
+train$action_taken <- factor(train$action_taken)
+```
+
+```{r}
+# Cross-validation data
+set.seed(1)
+train_folds <- vfold_cv(train, v = 5, strata = action_taken)
+```
+
+```{r}
+glimpse(train)
+```
+
+```{r}
 # Candidate recipes
 
 basic_recipe <- 
   recipe(action_taken ~ income, data = train)
 
-# add more recipes here!
+clean_recipe <- 
+  recipe(action_taken ~ ., data = train) %>%
+  step_rm(id) %>%
+  step_rm(activity_year,
+          legal_entity_identifier_lei, 
+          state,
+          ethnicity_of_applicant_or_borrower_2,
+          ethnicity_of_applicant_or_borrower_3,
+          ethnicity_of_applicant_or_borrower_4,
+          ethnicity_of_applicant_or_borrower_5,
+          race_of_applicant_or_borrower_2,
+          race_of_applicant_or_borrower_3,
+          race_of_applicant_or_borrower_4,
+          race_of_applicant_or_borrower_5,
+          race_of_co_applicant_or_co_borrower_2,
+          race_of_co_applicant_or_co_borrower_3,
+          race_of_co_applicant_or_co_borrower_4,
+          race_of_co_applicant_or_co_borrower_5,
+          total_points_and_fees,
+          prepayment_penalty_term,
+          introductory_rate_period,
+          multifamily_affordable_units,
+          automated_underwriting_system_2,
+          automated_underwriting_system_3,
+          automated_underwriting_system_4,
+          automated_underwriting_system_5
+          ) %>%
+  step_string2factor(all_nominal_predictors()) %>%
+  step_mutate(ethnicity_of_applicant_or_borrower_1 = factor(ethnicity_of_applicant_or_borrower_1, 
+                                                            exclude = NULL, 
+                                                            levels = c(levels(factor(ethnicity_of_applicant_or_borrower_1)), 
+                                                                       "NA"))) %>%
+  step_mutate(ethnicity_of_co_applicant_or_co_borrower_1 = factor(ethnicity_of_co_applicant_or_co_borrower_1, 
+                                                            exclude = NULL, 
+                                                            levels = c(levels(factor(ethnicity_of_co_applicant_or_co_borrower_1)), 
+                                                                       "NA"))) %>%
+  step_mutate(race_of_applicant_or_borrower_1 = factor(race_of_applicant_or_borrower_1, 
+                                                            exclude = NULL, 
+                                                            levels = c(levels(factor(race_of_applicant_or_borrower_1)), 
+                                                                       "NA"))) %>%
+  step_mutate(race_of_co_applicant_or_co_borrower_1 = factor(race_of_co_applicant_or_co_borrower_1, 
+                                                            exclude = NULL, 
+                                                            levels = c(levels(factor(race_of_co_applicant_or_co_borrower_1)), 
+                                                                       "NA"))) %>%
+  step_mutate(age_of_applicant_62 = factor(age_of_applicant_62, 
+                                                            exclude = NULL, 
+                                                            levels = c(levels(factor(age_of_applicant_62)), 
+                                                                       "NA"))) %>%
+  step_mutate(age_of_co_applicant_62 = factor(age_of_co_applicant_62, 
+                                                            exclude = NULL, 
+                                                            levels = c(levels(factor(age_of_co_applicant_62)), 
+                                                                       "NA"))) %>%
+  step_impute_knn(all_numeric_predictors()) %>%
+  step_dummy(all_factor_predictors())
+  
 ```
 
 ```{r}
@@ -135,8 +197,8 @@ log_spec <-
   set_mode("classification")
 
 # Set up preprocess object containing all candidate recipes
-preproc <- list(basic = basic_recipe
-                # add more here
+preproc <- list(basic = basic_recipe,
+                clean = clean_recipe
                 )
 
 keep_pred <- control_resamples(save_pred = TRUE, save_workflow = TRUE)
@@ -212,31 +274,31 @@ keras_spec <-
 # Logistic regression workflow
 log_wflow <-
  workflow() %>% 
- add_recipe(basic_recipe) %>%
+ add_recipe(clean_recipe) %>%
  add_model(log_spec)
 
 # Random forest workflow
 rf_wflow <-
  workflow() %>%
- add_recipe(basic_recipe) %>% 
+ add_recipe(clean_recipe) %>% 
  add_model(rf_spec) 
 
 # Boosted tree (XGBoost) workflow
 xgb_wflow <-
  workflow() %>%
- add_recipe(basic_recipe) %>% 
+ add_recipe(clean_recipe) %>% 
  add_model(xgb_spec)
 
 # K-nearest neighbor workflow
 knn_wflow <-
  workflow() %>%
- add_recipe(basic_recipe) %>% 
+ add_recipe(clean_recipe) %>% 
  add_model(knn_spec)
 
 # Neural network workflow
 keras_wflow <-
  workflow() %>%
- add_recipe(basic_recipe) %>% 
+ add_recipe(clean_recipe) %>% 
  add_model(keras_spec)
 ```
 
