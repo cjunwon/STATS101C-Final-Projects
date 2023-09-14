@@ -1,0 +1,744 @@
+```{r}
+# Load packages
+library(tidyverse)
+library(tidymodels)
+library(tidyselect)
+library(recipes)
+library(ranger)
+library(xgboost)
+library(keras)
+library(AppliedPredictiveModeling)
+library(ggplot2)
+library(dplyr)
+```
+
+```{r}
+# Load train and test data
+train <- read_csv('train2.csv', show_col_types = FALSE)
+test <- read_csv('test2.csv', show_col_types = FALSE)
+```
+
+# EDA
+
+```{r}
+# Update the train data frame with proper factor labels
+trainn <- train %>%
+  mutate(loan_type = factor(loan_type,
+                            levels = c(1, 2, 3, 4),
+                            labels = c("Conventional", "FHA insured", "VA guaranteed", "RHS or FSA guaranteed"))) %>%
+  mutate(loan_purpose = factor(loan_purpose,
+                               levels = c(1, 2, 31, 32, 4, 5),
+                               labels = c("Home purchase", "Home improvement", "Refinancing", "Cash-out refinancing", "Other purpose", "Not applicable")))
+
+# Calculate counts
+interaction_table <- table(trainn$loan_purpose, trainn$loan_type)
+interaction_df <- as.data.frame(interaction_table)
+colnames(interaction_df) <- c("Loan_Purpose", "Loan_Type", "Count")
+
+# Calculate the total counts for each Loan Purpose
+total_counts <- aggregate(Count ~ Loan_Purpose, data = interaction_df, FUN = sum)
+
+# Join total counts to individual counts and calculate percentages
+interaction_df <- merge(interaction_df, total_counts, by = "Loan_Purpose")
+colnames(interaction_df)[4] <- "Total"
+interaction_df$Percentage <- (interaction_df$Count / interaction_df$Total) * 100
+
+# Plotting
+ggplot(interaction_df, aes(x = Loan_Purpose, y = Percentage, fill = Loan_Type)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_manual(values = c("Conventional" = "blue", "FHA insured" = "green", "VA guaranteed" = "red", "RHS or FSA guaranteed" = "purple")) +
+  labs(
+    title = "Interaction between Loan Purpose and Loan Type by Percentage",
+    x = "Loan Purpose",
+    y = "Percentage"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Plotting with a stacked bar chart
+ggplot(interaction_df, aes(x = Loan_Purpose, y = Percentage, fill = Loan_Type)) +
+  geom_bar(stat = "identity", position = "stack") +  # Using "stack" for stacked bar chart
+  scale_fill_manual(values = c("Conventional" = "blue", "FHA insured" = "green", "VA guaranteed" = "red", "RHS or FSA guaranteed" = "purple")) +
+  labs(
+    title = "Interaction between Loan Purpose and Loan Type by Percentage",
+    x = "Loan Purpose",
+    y = "Percentage"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))  # Rotating x-axis labels
+
+
+```
+
+```{r}
+# Convert action_taken to a factor with meaningful names
+action<- train %>% mutate(action_taken = factor(action_taken, levels = c(1, 3),
+                               labels = c("Loan Originated", "Application Denied")))
+
+# Relationship between income and action_taken with jitter points
+ggplot(action, aes(x = action_taken, y = income, color = action_taken)) +
+  geom_boxplot(alpha = 0.7) +
+  geom_jitter(width = 0.2, alpha = 0.5) +
+  labs(x = "Action Taken", y = "Income", title = "Relationship between income and action_taken") +
+  theme(text = element_text(size = 12),
+        plot.title = element_text(size = 13))
+
+# Relationship between log-transformed income and action_taken with jitter points
+ggplot(action, aes(x = action_taken, y = log10(income), color = action_taken)) +
+  geom_boxplot(alpha = 0.7) +
+  geom_jitter(width = 0.1, alpha = 0.1) +
+  labs(x = "Action Taken", y = "Log10(Income)", title = "Relationship between log-transformed income and action_taken") +
+  theme(text = element_text(size = 12),
+        plot.title = element_text(size = 13))
+
+```
+
+```{r}
+#Race and Action both Count and Percentages 
+
+
+# Count the number of instances for each category
+
+
+counts <- train %>%
+  group_by(race_of_applicant_or_borrower_1, action_taken) %>%
+  summarise(count = n()) %>%
+  ungroup()
+total_counts <- counts %>%
+  group_by(race_of_applicant_or_borrower_1) %>%
+  summarise(total = sum(count))
+counts <- left_join(counts, total_counts, by = "race_of_applicant_or_borrower_1") %>%
+  mutate(percentage = (count / total) * 100)
+
+# Filter the counts
+filtered_counts <- counts %>% 
+  filter(count >= 1300)
+
+# Update the train data frame
+train <- train %>%
+  mutate(
+    race_of_applicant_or_borrower_1 = factor(
+      race_of_applicant_or_borrower_1,
+      levels = c(1, 2, 21, 22, 23, 24, 25, 26, 27, 3, 4, 41, 42, 43, 44, 5, 6, 7),
+      labels = c(
+        "American Indian or Alaska Native", "Asian", "Asian Indian", "Chinese", "Filipino", "Japanese",
+        "Korean", "Vietnamese", "Other Asian", "Black or African American",
+        "Native Hawaiian or Other Pacific Islander", "Native Hawaiian", "Guamanian or Chamorro",
+        "Samoan", "Other Pacific Islander", "White", "Information not provided", "Not applicable"
+      )
+    ),
+    action_taken = factor(action_taken, levels = c(1, 3), labels = c("Loan Originated", "Application Denied"))
+  )
+
+# Use filtered_counts for plotting
+ggplot(filtered_counts, aes(x = race_of_applicant_or_borrower_1, y = count, 
+                            fill = action_taken)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_manual(values = c("Loan Originated" = "green", "Application Denied" = "pink")) +
+  labs(
+    title = "Disparities in Loan Actions Across Different Races (Filtered by 1300+ counts)",
+    x = "Race of Applicant",
+    y = "Count"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+#Disparities in Loan Actions Across Different Races by Percentage
+train <- read_csv('train2.csv', show_col_types = FALSE)
+
+# Calculate the total counts for each race
+total_counts <- counts %>%
+  group_by(race_of_applicant_or_borrower_1) %>%
+  summarise(total = sum(count))
+
+# Join total counts to individual counts and calculate percentages
+counts <- left_join(counts, total_counts, by = "race_of_applicant_or_borrower_1") %>%
+  mutate(percentage = (count / total) * 100)
+
+# Filter the counts
+filtered_counts <- counts %>% 
+  filter(count >= 1300)
+
+# Plotting
+ggplot(filtered_counts, aes(x = race_of_applicant_or_borrower_1, y = percentage, fill = action_taken)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_manual(values = c("Loan Originated" = "orange", "Application Denied" = "purple")) +
+  labs(
+    title = "Disparities in Loan Actions Across Different Races by Percentage",
+    x = "Race of Applicant",
+    y = "Percentage"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+
+```{r}
+top_states <- train %>%
+  group_by(state) %>%
+  summarise(median_loan = median(loan_amount, na.rm = TRUE)) %>%
+  arrange(desc(median_loan)) %>%
+  head(10)
+
+top_states
+filtered_train2 <- train %>% 
+  filter(state %in% top_states$state)
+
+#Loan Amount by Top 10 States
+ggplot(filtered_train2, aes(x = state, y = log10(loan_amount), fill = state)) +
+  geom_boxplot() +
+  labs(title = "Loan Amount by Top 10 States (by Median Loan Amount)",
+       x = "State",
+       y = "Loan Amount") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+#Preproval vs Action Taken 
+
+train <- read_csv('train2.csv', show_col_types = FALSE)
+
+train2_mutated <- train %>%
+  mutate(preapproval = case_when(
+    preapproval == 1 ~ "Preapproval Requested",
+    preapproval == 2 ~ "Preapproval Not Requested",
+    TRUE ~ "Other"
+  )) %>%
+  mutate(loan_type = factor(action_taken,
+                            levels = c(1, 3),
+                            labels = c("Loan originated", "Application denied")))
+
+# Plot the data
+ggplot(train2_mutated, aes(x = preapproval, fill = as.factor(action_taken))) +
+  geom_bar(position = "dodge") +
+  ggtitle("Preapproval vs Action Taken") +
+  xlab("Preapproval Status") +
+  ylab("Count") +
+  scale_fill_manual(values = c("blue", "red"), 
+                    name = "Action Taken",
+                    labels = c("Loan originated", "Application denied"))
+
+
+```
+
+```{r}
+# Sex of applicant 
+
+# First, mutate the dataset to convert numerical codes to descriptive labels
+train2_sex <- train %>%
+  mutate(sex_of_applicant_or_borrower = case_when(
+    sex_of_applicant_or_borrower == 1 ~ "Male",
+    sex_of_applicant_or_borrower == 2 ~ "Female",
+    sex_of_applicant_or_borrower == 3 ~ "Info not provided (Mail/Internet/Telephone)",
+    sex_of_applicant_or_borrower == 4 ~ "Not applicable",
+    sex_of_applicant_or_borrower == 6 ~ "Both Male and Female",
+    TRUE ~ "Other"),
+     # Convert action_taken to a factor
+  ) %>%
+  mutate(action_taken = factor(action_taken,
+                            levels = c(1, 3),
+                            labels = c("Loan originated", "Application denied")))
+
+
+# Then, create the ggplot graph
+ggplot(train2_sex, aes(x = sex_of_applicant_or_borrower, fill = as.factor(action_taken))) + 
+  geom_bar(position = "dodge") +
+  ggtitle("Sex of Applicant vs Action Taken") +
+  xlab("Sex") +
+  ylab("Count") +
+  scale_fill_brewer(palette="Set1", name="Action Taken") +  # You can change the palette or use scale_fill_manual() for custom colors
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Optional: rotate x-axis text for better readability
+
+```
+
+```{r}
+#Age of Applicants 
+
+train2_age <- train %>% mutate(
+  age_cat = factor(age_of_applicant_or_borrower, 
+                   levels = c("0-18", "19-24", "25-34", "35-44", "45-54", "55-64", "65+"),
+                   ordered = TRUE)
+)
+
+# Create the ggplot graph
+ggplot(train2_age, aes(x = age_cat, fill = as.factor(action_taken))) + 
+  geom_bar(position = "dodge") +
+  ggtitle("Age Category vs Action Taken") +
+  xlab("Age Category") +
+  ylab("Count") +
+  scale_fill_brewer(palette = "Set1", name = "Action Taken") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+
+# Preprocessing / Recipes
+
+```{r}
+# Sort columns with and without NA
+no_na_cols_count <- 
+  train %>% 
+  summarise_all(~sum(is.na(.))) %>%
+  pivot_longer(everything(), names_to = "Column", values_to = "Missing_Count") %>%
+  filter(Missing_Count == 0)
+
+na_cols_count <- 
+  train %>% 
+  summarise_all(~sum(is.na(.))) %>%
+  pivot_longer(everything(), names_to = "Column", values_to = "Missing_Count") %>%
+  filter(Missing_Count > 0)
+
+na_cols_count_high <- 
+  train %>% 
+  summarise_all(~sum(is.na(.))) %>%
+  pivot_longer(everything(), names_to = "Column", values_to = "Missing_Count") %>%
+  filter(Missing_Count > 300000)
+
+no_na_cols <- pull(no_na_cols_count, Column)
+na_cols <- pull(na_cols_count, Column)
+na_cols_high <- pull(na_cols_count_high, Column)
+```
+
+```{r}
+# Print columns with no/low/high NA counts
+print(no_na_cols)
+print(na_cols)
+print(na_cols_high)
+```
+
+```{r}
+# Change outcome variable into factor
+train$action_taken <- factor(train$action_taken)
+```
+
+```{r}
+# Cross-validation data
+set.seed(1)
+train_folds <- vfold_cv(train, v = 5, strata = action_taken)
+```
+
+```{r}
+# glimpse(train)
+```
+
+```{r}
+# Define candidate recipes
+
+# Basic recipe takes only 'income' as the only predictor. Other columns either contain too many NA values and require conversions to factors
+basic_recipe <- 
+  recipe(action_taken ~ income, data = train) %>%
+  step_impute_median(all_numeric_predictors())
+
+# Clean recipe removes columns with over 300000 missing (NA) values, converts all categorical columns stored as numeric to factors, and also imputes missing values for numeric variables such as income and loan_amount
+clean_recipe <- 
+  recipe(action_taken ~ ., data = train) %>%
+  step_rm(id) %>%
+  step_rm(activity_year,
+          legal_entity_identifier_lei, 
+          state,
+          ethnicity_of_applicant_or_borrower_2,
+          ethnicity_of_applicant_or_borrower_3,
+          ethnicity_of_applicant_or_borrower_4,
+          ethnicity_of_applicant_or_borrower_5,
+          ethnicity_of_co_applicant_or_co_borrower_2,
+          ethnicity_of_co_applicant_or_co_borrower_3,
+          ethnicity_of_co_applicant_or_co_borrower_4,
+          ethnicity_of_co_applicant_or_co_borrower_5,
+          race_of_applicant_or_borrower_2,
+          race_of_applicant_or_borrower_3,
+          race_of_applicant_or_borrower_4,
+          race_of_applicant_or_borrower_5,
+          race_of_co_applicant_or_co_borrower_2,
+          race_of_co_applicant_or_co_borrower_3,
+          race_of_co_applicant_or_co_borrower_4,
+          race_of_co_applicant_or_co_borrower_5,
+          total_points_and_fees,
+          prepayment_penalty_term,
+          introductory_rate_period,
+          multifamily_affordable_units,
+          automated_underwriting_system_2,
+          automated_underwriting_system_3,
+          automated_underwriting_system_4,
+          automated_underwriting_system_5,
+          preapproval,
+          reverse_mortgage
+          ) %>%
+  step_string2factor(all_nominal_predictors()) %>%
+  step_impute_median(loan_amount, income, combined_loan_to_value_ratio, loan_term, property_value) %>%
+  step_naomit(all_numeric_predictors()) %>%
+  step_mutate(
+    ethnicity_of_applicant_or_borrower_1 = factor(ethnicity_of_applicant_or_borrower_1),
+    ethnicity_of_co_applicant_or_co_borrower_1 = factor(ethnicity_of_co_applicant_or_co_borrower_1),
+    race_of_applicant_or_borrower_1 = factor(race_of_applicant_or_borrower_1),
+    race_of_co_applicant_or_co_borrower_1 = factor(race_of_co_applicant_or_co_borrower_1),
+    loan_type = factor(loan_type),
+    loan_purpose = factor(loan_purpose),
+    construction_method = factor(construction_method),
+    occupancy_type = factor(occupancy_type),
+    ethnicity_of_applicant_or_borrower_collected_on_the_basis_of_visual_observation_or_surname = factor(ethnicity_of_applicant_or_borrower_collected_on_the_basis_of_visual_observation_or_surname),
+    ethnicity_of_co_applicant_or_co_borrower_collected_on_the_basis_of_visual_observation_or_surname = factor(ethnicity_of_co_applicant_or_co_borrower_collected_on_the_basis_of_visual_observation_or_surname),
+    race_of_applicant_or_borrower_collected_on_the_basis_of_visual_observation_or_surname = factor(race_of_applicant_or_borrower_collected_on_the_basis_of_visual_observation_or_surname),
+    race_of_co_applicant_or_co_borrower_collected_on_the_basis_of_visual_observation_or_surname = factor(race_of_co_applicant_or_co_borrower_collected_on_the_basis_of_visual_observation_or_surname),
+    sex_of_applicant_or_borrower = factor(sex_of_applicant_or_borrower),
+    sex_of_co_applicant_or_co_borrower = factor(sex_of_co_applicant_or_co_borrower),
+    sex_of_applicant_or_borrower_collected_on_the_basis_of_visual_observation_or_surname = factor(sex_of_applicant_or_borrower_collected_on_the_basis_of_visual_observation_or_surname),
+    sex_of_co_applicant_or_co_borrower_collected_on_the_basis_of_visual_observation_or_surname = factor(sex_of_co_applicant_or_co_borrower_collected_on_the_basis_of_visual_observation_or_surname),
+    hoepa_status = factor(hoepa_status),
+    lien_status = factor(lien_status),
+    applicant_or_borrower_name_and_version_of_credit_scoring_model = factor(applicant_or_borrower_name_and_version_of_credit_scoring_model),
+    co_applicant_or_co_borrower_name_and_version_of_credit_scoring_model = factor(co_applicant_or_co_borrower_name_and_version_of_credit_scoring_model),
+    balloon_payment = factor(balloon_payment),
+    interest_only_payments = factor(interest_only_payments),
+    negative_amortization = factor(negative_amortization),
+    other_non_amortizing_features = factor(other_non_amortizing_features),
+    manufactured_home_secured_property_type = factor(manufactured_home_secured_property_type),
+    manufactured_home_land_property_interest = factor(manufactured_home_land_property_interest),
+    submission_of_application = factor(submission_of_application),
+    initially_payable_to_your_institution = factor(initially_payable_to_your_institution),
+    automated_underwriting_system_1 = factor(automated_underwriting_system_1),
+    open_end_line_of_credit = factor(open_end_line_of_credit),
+    business_or_commercial_purpose = factor(business_or_commercial_purpose)
+  )
+
+# This third recipe creates dummy variables for all factor variables, which are required preprocessing for most models.
+
+clean_dummy_recipe <-
+  clean_recipe %>%
+  step_dummy(all_factor_predictors())
+  
+```
+
+```{r}
+# The following pipeline compares the above two recipes by testing against the same logistic regression model
+
+# Initialize baseline model (logistic regression model)
+log_spec <- 
+  logistic_reg() %>%
+  set_engine("glm") %>%
+  set_mode("classification")
+
+# Set up preprocess object containing all candidate recipes
+preproc <- list(basic = basic_recipe,
+                clean_dummy = clean_dummy_recipe
+                )
+
+keep_pred <- control_resamples(save_pred = FALSE, save_workflow = TRUE)
+
+# Create a workflow_set to test all candidate recipes against baseline logistic regression model
+recipe_res <- workflow_set(preproc = preproc,
+                          models = list(lr = log_spec),
+                          cross = FALSE)
+
+# Use workflow_map to call in v-fold cross validation data
+recipe_res <- 
+  recipe_res %>%
+  workflow_map("fit_resamples",
+               # Options to `workflow_map()`:
+               seed = 1, verbose = TRUE,
+               # Options to `fit_resamples()`:
+               resamples = train_folds,
+               metrics = metric_set(
+                  recall, precision, f_meas, 
+                  accuracy, kap,
+                  roc_auc, sens, spec),
+               control = keep_pred)
+```
+
+```{r}
+# See which recipe performs best
+recipe_res %>%
+  collect_metrics() %>%
+  filter(.metric == "f_meas")
+
+autoplot(recipe_res)
+
+# We are able to verify that the clean_dummy_recipe performs better with a high F score. Since most columns are categorical, we do not add any more custom columns to avoid recipe complexity and overfitting.
+```
+
+# Candidate models / Model evaluation / tuning
+
+```{r}
+# Logistic regression
+
+  # The "glmer" engine estimates fixed and random effect regression parameters using maximum likelihood (or restricted maximum likelihood) estimation. It can handle both fixed effects (like "glm") as well as random effects, which are additional sources of variation in the data that are not explicitly modeled.
+
+log_spec <- 
+  logistic_reg() %>%  
+  set_engine(engine = "glmer") %>% 
+  set_mode("classification")
+
+# Multinomial regression via glmnet
+
+  # The "glmet" engine uses linear predictors to predict multiclass data using the multinomial distribution. It primarily implements Lasso (L1 regularization) and Elastic-Net (a combination of Lasso and Ridge, allowing for a mix of L1 and L2 regularization) regularization techniques. One of the main benefits of "glmnet" is its ability to perform automatic variable selection by shrinking the coefficients of less important variables towards zero. This can be especially useful in situations where there are many predictor variables.
+
+multreg_spec <- 
+  multinom_reg(penalty = tune("pen"),
+               mixture = tune("mix")) %>%
+  set_engine("glmnet")
+
+# Random forest
+rf_spec <- 
+  rand_forest() %>% 
+  set_engine("ranger", importance = "impurity") %>% 
+  set_mode("classification")
+
+# Boosted tree (XGBoost)
+xgb_spec <- 
+  boost_tree(
+      trees = 100,
+      learn_rate = 0.1,
+      # Define a tuning grid
+      mtry = tune("mtry"),
+      min_n = tune("min_n"),
+      loss_reduction = tune("loss_red")
+  ) %>% 
+  set_engine("xgboost") %>% 
+  set_mode("classification") 
+
+# K-nearest neighbor
+knn_spec <- 
+  nearest_neighbor(neighbors = tune("k")) %>%
+  set_engine("kknn") %>% 
+  set_mode("classification") 
+
+# Naive Bayes models via naivebayes
+
+  # "naive_bayes" fits a model that uses Bayes' theorem to compute the probability of each class, given the predictor values. The columns for qualitative predictors should always be represented as factors (as opposed to dummy/indicator variables).
+
+nb_spec <- 
+  naive_Bayes(smoothness = tune("smooth"), 
+              Laplace = tune("Lap")) %>% 
+  set_engine("naivebayes") %>% 
+  
+
+# Multilayer perceptron via nnet (feed-forward neural network)
+nnet_spec <- 
+  mlp(epochs = 1000,
+      hidden_units = 5) %>%
+  set_engine("nnet") %>%
+  set_mode("classification")
+
+# Multilayer perceptron via brulee
+brulee_spec <-
+  mlp(epochs = 1000,
+      hidden_units = 5,
+      penalty = 0.01, 
+      learn_rate = 0.1,
+      activation = "relu") %>%
+  set_engine("brulee")
+  set_mode("classification")
+```
+
+```{r}
+# Workflows
+
+# Logistic regression workflow
+log_wflow <-
+ workflow() %>% 
+ add_recipe(clean_dummy_recipe) %>%
+ add_model(log_spec)
+
+# Multinomial regression via glmnet workflow
+multreg_wflow <-
+  workflow() %>%
+  add_recipe(clean_dummy_recipe) %>%
+  add_model(multreg_spec)
+
+# Random forest workflow
+rf_wflow <-
+ workflow() %>%
+ add_recipe(clean_dummy_recipe) %>% 
+ add_model(rf_spec) 
+
+# Boosted tree (XGBoost) workflow
+xgb_wflow <-
+ workflow() %>%
+ add_recipe(clean_dummy_recipe) %>% 
+ add_model(xgb_spec)
+
+# K-nearest neighbor workflow
+knn_wflow <-
+ workflow() %>%
+ add_recipe(clean_dummy_recipe) %>% 
+ add_model(knn_spec)
+
+# Naive Bayes models via naivebayes workflow
+nb_wflow <-
+  workflow() %>%
+  add_recipe(clean_recipe) %>% # Note this is the recipe without dummy vars
+  add_model(nb_spec)
+
+# Multilayer perceptron via nnet (feed-forward neural network) workflow 
+nnet_wflow <-
+  workflow() %>%
+  add_recipe(clean_dummy_recipe) %>% 
+  add_model(nnet_spec)
+
+# Multilayer perceptron via brulee workflow
+brulee_wflow <-
+ workflow() %>%
+ add_recipe(clean_dummy_recipe) %>% 
+ add_model(brulee_spec)
+```
+
+```{r}
+# Model evaluation
+set.seed(1)
+
+metric <- metric_set(recall, precision, f_meas, accuracy, kap, roc_auc, sens, spec)
+```
+
+```{r}
+# Logistic regression results
+log_res <- 
+  log_wflow %>%
+  fit_resamples(resamples = train_folds,
+                metrics = metric,
+                control = control_resamples(save_pred = FALSE, save_workflow = TRUE))
+```
+
+```{r}
+show_best(log_res, metric = "f_meas")
+autoplot(log_res)
+```
+
+```{r}
+# Multinomial regression via glmnet results
+multreg_res <-
+  multreg_wflow %>%
+  tune_grid(resamples = train_folds,
+                metrics = metric,
+                control = control_grid())
+```
+
+```{r}
+show_best(multreg_res, metric = "f_meas")
+autoplot(multreg_res)
+```
+
+```{r}
+# Random forest results
+rf_res <- 
+  rf_wflow %>%
+  fit_resamples(resamples = train_folds,
+                metrics = metric,
+                control = control_resamples(save_pred = FALSE, save_workflow = TRUE))
+```
+
+```{r}
+show_best(rf_res, metric = "f_meas")
+autoplot(rf_res)
+```
+
+```{r}
+# Boosted tree (XGBoost) results
+xgb_res <-
+  xgb_wflow %>%
+  tune_grid(resamples = train_folds,
+                metrics = metric,
+                control = control_grid())
+```
+
+```{r}
+show_best(xgb_res, metric = "f_meas")
+autoplot(xgb_res)
+```
+
+```{r}
+# K-nearest neighbor results
+knn_res <-
+  knn_wflow %>%
+  tune_grid(resamples = train_folds,
+                metrics = metric,
+                control = control_grid())
+```
+
+```{r}
+show_best(knn_res, metric = "f_meas")
+autoplot(knn_res)
+```
+
+```{r}
+# Naive Bayes models via naivebayes results
+nb_res <-
+  nb_wflow %>%
+  tune_grid(resamples = train_folds,
+                metrics = metric,
+                control = control_grid())
+```
+
+```{r}
+show_best(nb_res, metric = "f_meas")
+autoplot(nb_res)
+```
+
+```{r}
+# Multilayer perceptron via nnet (feed-forward neural network) results
+nnet_res <- 
+  nnet_wflow %>%
+  fit_resamples(resamples = train_folds,
+                metrics = metric,
+                control = control_resamples(save_pred = FALSE, save_workflow = TRUE))
+```
+
+```{r}
+show_best(nnet_res, metric = "f_meas")
+autoplot(nnet_res)
+```
+
+```{r}
+# Multilayer perceptron via brulee results
+brulee_res <-
+  brulee_wflow %>%
+  fit_resamples(resamples = train_folds,
+                metrics = metric,
+                control = control_resamples(save_pred = FALSE, save_workflow = TRUE))
+```
+
+```{r}
+show_best(brulee_res, metric = "f_meas")
+autoplot(brulee_res)
+```
+
+```{r}
+# (For Samantha) Add stacked model + stack plots + output here
+
+test_stack <- 
+  stacks() %>%
+  #add_candidates(log_res) %>%
+  add_candidates(xgboost_res) %>%
+  add_candidates(lightgbm_res) %>%
+  add_candidates(C20_res) #%>%
+ # add_candidates(nueral_res)
+
+test_stack <-
+  test_stack %>%
+  blend_predictions()
+
+test_stack <-
+  test_stack %>%
+  fit_members()
+
+autoplot(test_stack)
+   
+autoplot(test_stack, type = "weights")
+```
+
+```{r}
+# (For Samantha) Add final predictions + output here
+test_res_stacked <- 
+  test_stack %>% 
+  predict(test2) %>%
+  cbind(test2 %>% select(id)) %>%
+  select(id, .pred_class)
+
+test_res_stacked <- 
+  test_res_stacked %>% 
+  rename(action_taken = .pred_class) %>% 
+  write_csv("stacked_predictions3.csv")
+
+```
