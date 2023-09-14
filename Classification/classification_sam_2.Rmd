@@ -1,0 +1,512 @@
+---
+title: "stats101c_final_classification"
+output: html_document
+date: "2023-09-11"
+---
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(tidyselect)
+library(recipes)
+```
+
+```{r}
+train2 <- read_csv("train2.csv")
+test2 <- read_csv("test2.csv")
+test2<- read_csv("test2.csv", guess_max = nrow(test2))
+train2 <- read_csv("train2.csv", guess_max = nrow(train2))
+```
+
+```{r}
+train2$action_taken <- factor(train2$action_taken)
+#test2$action_taken <- factor(test2$action_taken)
+## recipe
+recipe_2 <- recipe(action_taken~. , data = train2) %>%
+    step_rm(total_points_and_fees, prepayment_penalty_term , introductory_rate_period, automated_underwriting_system_2, automated_underwriting_system_4, automated_underwriting_system_3, automated_underwriting_system_5, multifamily_affordable_units)%>%
+  step_rm(id)  %>%
+  ## race
+  step_mutate(race_of_co_applicant_or_co_borrower_2 = ifelse(is.na(race_of_co_applicant_or_co_borrower_2), 0, race_of_co_applicant_or_co_borrower_2)) %>%
+  step_mutate(race_of_co_applicant_or_co_borrower_1 = ifelse(is.na(race_of_co_applicant_or_co_borrower_1), 0, race_of_co_applicant_or_co_borrower_1)) %>%
+  step_mutate(race_of_co_applicant_or_co_borrower_3 = ifelse(is.na(race_of_co_applicant_or_co_borrower_3), 0, race_of_co_applicant_or_co_borrower_3)) %>%
+  step_mutate(race_of_co_applicant_or_co_borrower_4 = ifelse(is.na(race_of_co_applicant_or_co_borrower_4), 0, race_of_co_applicant_or_co_borrower_4)) %>%
+  step_mutate(race_of_co_applicant_or_co_borrower_5 = ifelse(is.na(race_of_co_applicant_or_co_borrower_5), 0, race_of_co_applicant_or_co_borrower_5)) %>%
+  step_mutate(race_of_co_applicant_or_co_borrower_4 = factor(race_of_co_applicant_or_co_borrower_4)) %>%
+  step_mutate(race_of_co_applicant_or_co_borrower_3 = factor(race_of_co_applicant_or_co_borrower_3)) %>%
+  step_mutate(race_of_co_applicant_or_co_borrower_2 = factor(race_of_co_applicant_or_co_borrower_2))%>%
+  step_mutate(race_of_co_applicant_or_co_borrower_1 = factor(race_of_co_applicant_or_co_borrower_1)) %>%
+  step_mutate(race_of_co_applicant_or_co_borrower_5 = factor(race_of_co_applicant_or_co_borrower_5)) %>%
+  step_mutate(race_of_applicant_or_borrower_1 = ifelse(is.na(race_of_applicant_or_borrower_1), 0, race_of_applicant_or_borrower_1)) %>%
+  step_mutate(race_of_applicant_or_borrower_1 = factor(race_of_applicant_or_borrower_1)) %>%
+  step_mutate(race_of_applicant_or_borrower_2 = ifelse(is.na(race_of_applicant_or_borrower_2), 0, race_of_applicant_or_borrower_2)) %>%
+  step_mutate(race_of_applicant_or_borrower_2 = factor(race_of_applicant_or_borrower_2)) %>%
+  step_mutate(race_of_applicant_or_borrower_3 = ifelse(is.na(race_of_applicant_or_borrower_3), 0, race_of_applicant_or_borrower_3)) %>%
+  step_mutate(race_of_applicant_or_borrower_3 = factor(race_of_applicant_or_borrower_3)) %>%
+  step_mutate(race_of_applicant_or_borrower_4 = ifelse(is.na(race_of_applicant_or_borrower_4), 0, race_of_applicant_or_borrower_4)) %>%
+  step_mutate(race_of_applicant_or_borrower_4 = factor(race_of_applicant_or_borrower_4)) %>%
+  step_mutate(race_of_applicant_or_borrower_5 = ifelse(is.na(race_of_applicant_or_borrower_5), 0, race_of_applicant_or_borrower_5)) %>%
+  step_mutate(race_of_applicant_or_borrower_5 = factor(race_of_applicant_or_borrower_5)) %>%
+  ## ethnicity
+  step_mutate(ethnicity_of_applicant_or_borrower_1 = ifelse(is.na(ethnicity_of_applicant_or_borrower_1), 0, ethnicity_of_applicant_or_borrower_1)) %>%
+  step_mutate(ethnicity_of_applicant_or_borrower_1 = factor(ethnicity_of_applicant_or_borrower_1)) %>%
+  step_mutate(ethnicity_of_applicant_or_borrower_2 = ifelse(is.na(ethnicity_of_applicant_or_borrower_2), 0, ethnicity_of_applicant_or_borrower_2)) %>%
+  step_mutate(ethnicity_of_applicant_or_borrower_2 = factor(ethnicity_of_applicant_or_borrower_2)) %>%
+  step_mutate(ethnicity_of_applicant_or_borrower_3 = ifelse(is.na(ethnicity_of_applicant_or_borrower_3), 0, ethnicity_of_applicant_or_borrower_3)) %>%
+  step_mutate(ethnicity_of_applicant_or_borrower_3 = factor(ethnicity_of_applicant_or_borrower_3)) %>%
+  step_mutate(ethnicity_of_applicant_or_borrower_4 = ifelse(is.na(ethnicity_of_applicant_or_borrower_4), 0, ethnicity_of_applicant_or_borrower_4)) %>%
+  step_mutate(ethnicity_of_applicant_or_borrower_4 = factor(ethnicity_of_applicant_or_borrower_4)) %>%
+  step_mutate(ethnicity_of_applicant_or_borrower_5 = ifelse(is.na(ethnicity_of_applicant_or_borrower_5), 0, ethnicity_of_applicant_or_borrower_5)) %>%
+  step_mutate(ethnicity_of_applicant_or_borrower_5 = factor(ethnicity_of_applicant_or_borrower_5)) %>%
+  step_mutate(ethnicity_of_co_applicant_or_co_borrower_1 = ifelse(is.na(ethnicity_of_co_applicant_or_co_borrower_1), 0, ethnicity_of_co_applicant_or_co_borrower_1)) %>%
+  step_mutate(ethnicity_of_co_applicant_or_co_borrower_1 = factor(ethnicity_of_co_applicant_or_co_borrower_1)) %>%
+  step_mutate(ethnicity_of_co_applicant_or_co_borrower_2 = ifelse(is.na(ethnicity_of_co_applicant_or_co_borrower_2), 0, ethnicity_of_co_applicant_or_co_borrower_2)) %>%
+  step_mutate(ethnicity_of_co_applicant_or_co_borrower_2 = factor(ethnicity_of_co_applicant_or_co_borrower_2)) %>%
+  step_mutate(ethnicity_of_co_applicant_or_co_borrower_3 = ifelse(is.na(ethnicity_of_co_applicant_or_co_borrower_3), 0, ethnicity_of_co_applicant_or_co_borrower_3)) %>%
+  step_mutate(ethnicity_of_co_applicant_or_co_borrower_3 = factor(ethnicity_of_co_applicant_or_co_borrower_3)) %>%
+  step_mutate(ethnicity_of_co_applicant_or_co_borrower_4 = ifelse(is.na(ethnicity_of_co_applicant_or_co_borrower_4), 0, ethnicity_of_co_applicant_or_co_borrower_4)) %>%
+  step_mutate(ethnicity_of_co_applicant_or_co_borrower_4 = factor(ethnicity_of_co_applicant_or_co_borrower_4)) %>%
+  step_mutate(ethnicity_of_co_applicant_or_co_borrower_5 = ifelse(is.na(ethnicity_of_co_applicant_or_co_borrower_5), 0, ethnicity_of_co_applicant_or_co_borrower_5)) %>%
+  step_mutate(ethnicity_of_co_applicant_or_co_borrower_5 = factor(ethnicity_of_co_applicant_or_co_borrower_5)) %>%
+  
+  
+  #step_mutate(introductory_rate_period = ifelse(is.na(introductory_rate_period), 0, introductory_rate_period)) %>%
+  #step_mutate(introductory_rate_period = factor(introductory_rate_period)) %>%
+  
+  step_zv(all_predictors()) %>%
+  step_impute_mean(combined_loan_to_value_ratio, loan_term) %>%
+  step_rm(state) %>%
+ step_rm(age_of_applicant_62, age_of_co_applicant_62) %>%
+  step_impute_mean(property_value, income) %>% 
+  step_mutate(manufactured_home_secured_property_type = factor(manufactured_home_secured_property_type), manufactured_home_land_property_interest = factor(manufactured_home_land_property_interest)) %>%
+  step_mutate(loan_type = factor(loan_type), occupancy_type = factor(occupancy_type)) %>%
+  step_mutate(ethnicity_of_applicant_or_borrower_collected_on_the_basis_of_visual_observation_or_surname =     factor(ethnicity_of_applicant_or_borrower_collected_on_the_basis_of_visual_observation_or_surname),
+              ethnicity_of_co_applicant_or_co_borrower_collected_on_the_basis_of_visual_observation_or_surname =         factor(ethnicity_of_co_applicant_or_co_borrower_collected_on_the_basis_of_visual_observation_or_surname)) %>%
+  step_mutate(construction_method = factor(construction_method), construction_type = factor(construction_method), loan_purpose = factor(loan_purpose)) %>%
+  step_mutate(race_of_applicant_or_borrower_collected_on_the_basis_of_visual_observation_or_surname = factor(race_of_applicant_or_borrower_collected_on_the_basis_of_visual_observation_or_surname), 
+              race_of_co_applicant_or_co_borrower_collected_on_the_basis_of_visual_observation_or_surname = factor(race_of_co_applicant_or_co_borrower_collected_on_the_basis_of_visual_observation_or_surname)) %>%
+  step_string2factor(all_nominal_predictors()) %>%
+  step_dummy(all_factor_predictors())
+
+
+clean_recipe <- 
+  recipe(action_taken ~ ., data = train2) %>%
+  step_rm(id) %>%
+  step_rm(activity_year,
+          legal_entity_identifier_lei, 
+          state,
+          ethnicity_of_applicant_or_borrower_2,
+          ethnicity_of_applicant_or_borrower_3,
+          ethnicity_of_applicant_or_borrower_4,
+          ethnicity_of_applicant_or_borrower_5,
+          race_of_applicant_or_borrower_2,
+          race_of_applicant_or_borrower_3,
+          race_of_applicant_or_borrower_4,
+          race_of_applicant_or_borrower_5,
+          race_of_co_applicant_or_co_borrower_2,
+          race_of_co_applicant_or_co_borrower_3,
+          race_of_co_applicant_or_co_borrower_4,
+          race_of_co_applicant_or_co_borrower_5,
+          total_points_and_fees,
+          prepayment_penalty_term,
+          introductory_rate_period,
+          multifamily_affordable_units,
+          automated_underwriting_system_2,
+          automated_underwriting_system_3,
+          automated_underwriting_system_4,
+          automated_underwriting_system_5
+          ) %>%
+  step_string2factor(all_nominal_predictors()) %>%
+  step_mutate(ethnicity_of_applicant_or_borrower_1 = factor(ethnicity_of_applicant_or_borrower_1, 
+                                                            exclude = NULL, 
+                                                            levels = c(levels(factor(ethnicity_of_applicant_or_borrower_1)), 
+                                                                       "NA"))) %>%
+  step_mutate(ethnicity_of_co_applicant_or_co_borrower_1 = factor(ethnicity_of_co_applicant_or_co_borrower_1, 
+                                                            exclude = NULL, 
+                                                            levels = c(levels(factor(ethnicity_of_co_applicant_or_co_borrower_1)), 
+                                                                       "NA"))) %>%
+  step_mutate(race_of_applicant_or_borrower_1 = factor(race_of_applicant_or_borrower_1, 
+                                                            exclude = NULL, 
+                                                            levels = c(levels(factor(race_of_applicant_or_borrower_1)), 
+                                                                       "NA"))) %>%
+  step_mutate(race_of_co_applicant_or_co_borrower_1 = factor(race_of_co_applicant_or_co_borrower_1, 
+                                                            exclude = NULL, 
+                                                            levels = c(levels(factor(race_of_co_applicant_or_co_borrower_1)), 
+                                                                       "NA"))) %>%
+  step_mutate(age_of_applicant_62 = factor(age_of_applicant_62, 
+                                                            exclude = NULL, 
+                                                            levels = c(levels(factor(age_of_applicant_62)), 
+                                                                       "NA"))) %>%
+  step_mutate(age_of_co_applicant_62 = factor(age_of_co_applicant_62, 
+                                                            exclude = NULL, 
+                                                            levels = c(levels(factor(age_of_co_applicant_62)), 
+                                                                       "NA"))) %>%
+  step_impute_median(all_numeric_predictors()) %>%
+  step_dummy(all_factor_predictors())
+```
+
+```{r}
+set.seed(10)
+train_folds <- train2 %>% vfold_cv(v = 3)
+```
+
+## logistic model
+
+```{r}
+library(stacks)
+logistic_model <- logistic_reg(penalty = 0.01) %>%
+                set_engine("glmnet")
+
+workflow <- 
+  workflow() %>%
+  add_recipe(recipe_2) %>%
+  add_model(logistic_model)
+
+crossval_fit_1 <- 
+  workflow %>%
+  fit_resamples(train_folds)
+
+crossval_fit_1 %>% 
+  collect_metrics()
+
+log_res <- 
+  tune_grid(
+  workflow,
+  resamples = train_folds,
+  grid = 5,
+  metric = "accuracy",
+  control = control_stack_grid()
+)
+```
+
+## XG Boost
+
+```{r}
+# normal XG boost
+library(xgboost)
+# Create a random forest model specification
+rf_model2 <-boost_tree(mode = "classification") %>%
+  set_engine("xgboost")
+workflow2 <- 
+  workflow() %>%
+  add_recipe(recipe_2) %>%
+  add_model(rf_model2)
+
+crossval_fit_2 <- 
+  workflow2 %>%
+  fit_resamples(train_folds)
+
+crossval_fit_2 %>% 
+  collect_metrics()
+
+xgboost_res <- 
+  tune_grid(
+  workflow2,
+  resamples = train_folds,
+  grid = 5,
+  metric = "accuracy",
+  control = control_stack_grid()
+)
+```
+
+```{r}
+# normal XG boost
+library(xgboost)
+# Create a random forest model specification
+rf_model3 <-boost_tree(mode = "classification") %>%
+  set_engine("lightgbm")
+workflow4 <- 
+  workflow() %>%
+  add_recipe(clean_recipe) %>%
+  add_model(rf_model3)
+
+crossval_fit_4 <- 
+  workflow4 %>%
+  fit_resamples(train_folds)
+
+crossval_fit_4 %>% 
+  collect_metrics()
+```
+
+```{r}
+library(lightgbm)
+library(bonsai)
+
+catboost_spec <- boost_tree(
+   mode = "classification", 
+  trees = 1000,
+  learn_rate = 0.0208,
+  # Define a tuning grid
+  tree_depth = 20,  # Adjust the range based on your knowledge of the problem
+  mtry = 150,  # Adjust the range based on your knowledge of the problem
+ # min_n = 5,  # Adjust the range based on your knowledge of the problem
+  loss_reduction = 0.020,  # Adjust the range based on your 
+
+) %>% set_engine("lightgbm", verbose = 1)
+
+workflow3 <- 
+  workflow() %>%
+  add_recipe(recipe_2) %>%
+  add_model(catboost_spec)
+
+crossval_fit_3 <- 
+  workflow3 %>%
+  fit_resamples(train_folds)
+
+crossval_fit_3 %>% 
+  collect_metrics()
+
+lightgbm_res <- 
+  tune_grid(
+  workflow3,
+  resamples = train_folds,
+  grid = 5,
+  metric = "accuracy",
+  control = control_stack_grid()
+)
+
+```
+
+### Tuning
+
+```{r}
+# Define model specification
+boost_tree_spec <- boost_tree(
+  mode = "classification", 
+  trees = 100,
+  learn_rate = 0.0208,
+  # Define a tuning grid
+  tree_depth = 15,  # Adjust the range based on your knowledge of the problem
+  mtry = 150,  # Adjust the range based on your knowledge of the problem
+  min_n = 1,  # Adjust the range based on your knowledge of the problem
+  loss_reduction = 0.025,  # Adjust the range based on your 
+
+) %>% set_engine("lightgbm")
+
+# Define a tuning grid
+# Define a more complex tuning grid
+# Define a tuning grid
+grid <- grid_regular(
+  #tree_depth(range = c(1, 30), trans = NULL),  # Adjust the range based on your knowledge of the problem
+  #trees(range = c(100, 100), trans = NULL),  # Adjust the range based on your knowledge of the problem
+  #learn_rate(range = c(0.001, 0.1), trans = NULL),  # Adjust the range based on your knowledge of the problem
+  #mtry(range = c(20, 100 ), trans = NULL),  # Adjust the range based on your knowledge of the problem
+  #min_n(range = c(5, 100), trans = NULL),  # Adjust the range based on your knowledge of the problem
+ loss_reduction(range = c(0, 0.1), trans = NULL),  # Adjust the range based on your knowledge of the problem
+  levels = 5  # or another number to control the grid size
+)
+
+
+
+
+# Define a workflow
+workflow <- workflow() %>% 
+  add_model(boost_tree_spec) %>% 
+  add_recipe(recipe_2)
+
+# Run the tuning grid
+tune_res <- tune_grid(
+  workflow,
+  resamples = train_folds,
+  grid = grid
+)
+
+# View results
+show_best(tune_res, metric = "accuracy")
+autoplot(tune_res)
+```
+
+# Catboost Engine
+
+```{r}
+# Load required libraries
+library(parsnip)
+#library(catboost)
+
+# Set up CatBoost model
+catboost_model <- boost_tree() %>%
+  set_engine("C5.0") %>%
+  set_mode("classification")
+
+workflow5 <- 
+  workflow() %>%
+  add_recipe(clean_recipe) %>%
+  add_model(catboost_model)
+
+crossval_fit_4 <- 
+  workflow5 %>%
+  fit_resamples(train_folds)
+
+crossval_fit_4 %>% 
+  collect_metrics()
+
+```
+
+```{r}
+ 
+library(parsnip)
+#library(catboost)
+
+# Set up CatBoost model
+catboost_model <- boost_tree(mode = "classification", 
+  trees = 100,min_n = 5, sample_size = 0.5) %>%
+  set_engine("C5.0")
+
+workflow6 <- 
+  workflow() %>%
+  add_recipe(clean_recipe) %>%
+  add_model(catboost_model)
+
+crossval_fit_5 <- 
+  workflow6 %>%
+  fit_resamples(train_folds)
+
+crossval_fit_5 %>% 
+  collect_metrics()
+
+C20_res <- 
+  tune_grid(
+  workflow6,
+  resamples = train_folds,
+  grid = 5,
+  metric = "accuracy",
+  control = control_stack_grid()
+)
+```
+
+```{r}
+# Load required libraries
+library(parsnip)
+#library(catboost)
+
+# Set up CatBoost model
+boost_model <- boost_tree() %>%
+  set_engine("spark") %>%
+  set_mode("classification") %>% translate()
+
+workflow6 <- 
+  workflow() %>%
+  add_recipe(clean_recipe) %>%
+  add_model(boost_model)
+
+crossval_fit_5 <- 
+  workflow6 %>%
+  fit_resamples(train_folds)
+
+crossval_fit_5 %>% 
+  collect_metrics()
+
+```
+
+# Nueral Network
+
+```{r}
+#install.packages("devtools")
+#devtools::install_github("tidymodels/brulee")
+library(tidyverse)
+library(parsnip)
+library(recipes)
+library(workflows)
+library(brulee)
+library(keras)
+
+# Create a modified recipe based on the existing one
+recipe_neural <- recipe_2 %>%
+  # Add additional preprocessing steps optimized for neural network
+  # For example, normalize all numeric predictors
+  step_normalize(all_numeric_predictors())
+
+# Define the neural network model with fewer epochs and hidden layers
+nnet_spec <- 
+  mlp(epochs = 800, hidden_units = 2, penalty = 0.01, learn_rate = 0.0608) %>% 
+  set_engine("brulee", validation = 0.1) %>%  # Reserve 20% of data for validation
+  set_mode("classification")
+
+# Add early stopping
+#early_stop <- EarlyStopping(patience = 10,  # Number of epochs with no improvement
+                                      ##mode = "auto")  # Direction that is optimal ("auto", "min", or "max")
+
+# Create the workflow with the neural-specific recipe
+nnet_wflow <- 
+  recipe_neural %>% 
+  workflow(nnet_spec)  # Add early stopping callback
+
+# Fit the model
+set.seed(987)
+nnet_fit <- fit(nnet_wflow, train2)
+
+crossval_fit_net <- 
+  nnet_wflow %>%
+  fit_resamples(train_folds)
+
+crossval_fit_net %>% 
+  collect_metrics()
+
+nueral_res <- 
+  tune_grid(
+  nnet_wflow,
+  resamples = train_folds,
+  grid = 5,
+  metric = "accuracy",
+  control = control_stack_grid()
+)
+```
+
+# Stacked predictions
+
+```{r}
+test_stack <- 
+  stacks() %>%
+  add_candidates(log_res) %>%
+  add_candidates(xgboost_res) %>%
+  add_candidates(lightgbm_res) %>%
+  add_candidates(C20_res) #%>%
+  add_candidates(nueral_res)
+
+test_stack <-
+  test_stack %>%
+  blend_predictions()
+
+test_stack <-
+  test_stack %>%
+  fit_members()
+
+test_res_stacked <- 
+  test_stack %>% 
+  predict(test2) %>%
+  cbind(test2 %>% select(id)) %>%
+  select(id, .pred_class)
+
+test_res_stacked <- 
+  test_res_stacked %>% 
+  rename(action_taken = .pred_class) %>% 
+  write_csv("stacked_predictions.csv")
+
+```
+
+```{r}
+set.seed(10) 
+
+
+
+prepped_recipe <- prep(recipe_2, training = train2)
+baked_train_data <- bake(prepped_recipe, new_data = NULL)
+baked_test_data <- bake(recipe_neural, new_data = test2)
+
+rf_workflow_fit<- fit(workflow6,data=train2)
+
+
+
+# Continue with the prediction
+predictions <- predict(rf_workflow_fit, new_data = test2)
+
+
+final_predictions<-bind_cols(test2 %>% select(id),predictions) 
+final_predictions
+
+final_predictions_renamed<-final_predictions %>% rename( 
+  id = id,
+  action_taken = .pred_class
+  )
+
+write_csv(final_predictions_renamed,"final_predictions6.csv")
+```
