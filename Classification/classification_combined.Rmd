@@ -296,7 +296,7 @@ train$action_taken <- factor(train$action_taken)
 ```{r}
 # Cross-validation data
 set.seed(1)
-train_folds <- vfold_cv(train, v = 5, strata = action_taken)
+train_folds <- vfold_cv(train, v = 3, repeats = 5, strata = action_taken)
 ```
 
 ```{r}
@@ -464,7 +464,7 @@ log_spec <-
 
 multreg_spec <- 
   multinom_reg(penalty = tune("pen"),
-               mixture = tune("mix")) %>%
+               mixture = 0.5) %>%
   set_engine("glmnet")
 
 # Random forest
@@ -622,8 +622,6 @@ rf_res <-
 ```{r}
 show_best(rf_res, metric = "f_meas")
 autoplot(rf_res)
-
-show_notes(.Last.tune.result)
 ```
 
 ```{r}
