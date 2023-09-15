@@ -579,10 +579,10 @@ brulee_wflow <-
 # Model evaluation
 set.seed(1)
 
-metric <- metric_set(recall, precision, f_meas, accuracy, kap, roc_auc, sens, spec)
+metric <- metric_set(f_meas, accuracy, roc_auc)
 ```
 
-```{r}
+```{r, error=FALSE}
 # Logistic regression results
 log_res <- 
   log_wflow %>%
@@ -591,12 +591,12 @@ log_res <-
                 control = control_resamples(save_pred = FALSE, save_workflow = TRUE))
 ```
 
-```{r}
+```{r, error=FALSE}
 show_best(log_res, metric = "f_meas")
 # autoplot(log_res)
 ```
 
-```{r}
+```{r, error=FALSE}
 # Multinomial regression via glmnet results
 multreg_res <-
   multreg_wflow %>%
@@ -605,12 +605,12 @@ multreg_res <-
                 control = control_grid())
 ```
 
-```{r}
+```{r, error=FALSE}
 show_best(multreg_res, metric = "f_meas")
 autoplot(multreg_res)
 ```
 
-```{r}
+```{r, error=FALSE}
 # Random forest results
 rf_res <- 
   rf_wflow %>%
@@ -619,12 +619,12 @@ rf_res <-
                 control = control_resamples(save_pred = FALSE, save_workflow = TRUE))
 ```
 
-```{r}
+```{r, error=FALSE}
 show_best(rf_res, metric = "f_meas")
 autoplot(rf_res)
 ```
 
-```{r}
+```{r, error=FALSE}
 # Boosted tree (XGBoost) results
 xgb_res <-
   xgb_wflow %>%
@@ -633,12 +633,12 @@ xgb_res <-
                 control = control_grid())
 ```
 
-```{r}
+```{r, error=FALSE}
 show_best(xgb_res, metric = "f_meas")
 autoplot(xgb_res)
 ```
 
-```{r}
+```{r, error=FALSE}
 # K-nearest neighbor results
 knn_res <-
   knn_wflow %>%
@@ -647,12 +647,12 @@ knn_res <-
                 control = control_grid())
 ```
 
-```{r}
+```{r, error=FALSE}
 show_best(knn_res, metric = "f_meas")
 autoplot(knn_res)
 ```
 
-```{r}
+```{r, error=FALSE}
 # Naive Bayes models via naivebayes results
 nb_res <-
   nb_wflow %>%
@@ -661,12 +661,12 @@ nb_res <-
                 control = control_grid())
 ```
 
-```{r}
+```{r, error=FALSE}
 show_best(nb_res, metric = "f_meas")
 autoplot(nb_res)
 ```
 
-```{r}
+```{r, error=FALSE}
 # Multilayer perceptron via nnet (feed-forward neural network) results
 nnet_res <- 
   nnet_wflow %>%
@@ -675,12 +675,12 @@ nnet_res <-
                 control = control_resamples(save_pred = FALSE, save_workflow = TRUE))
 ```
 
-```{r}
+```{r, error=FALSE}
 show_best(nnet_res, metric = "f_meas")
 autoplot(nnet_res)
 ```
 
-```{r}
+```{r, error=FALSE}
 # Multilayer perceptron via brulee results
 brulee_res <-
   brulee_wflow %>%
@@ -689,7 +689,7 @@ brulee_res <-
                 control = control_resamples(save_pred = FALSE, save_workflow = TRUE))
 ```
 
-```{r}
+```{r, error=FALSE}
 show_best(brulee_res, metric = "f_meas")
 autoplot(brulee_res)
 ```
