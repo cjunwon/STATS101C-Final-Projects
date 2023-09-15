@@ -19,7 +19,244 @@ test <- read_csv('test2.csv', show_col_types = FALSE)
 # EDA
 
 ```{r}
-# (For Junwon OR Bo) Add finalized EDA here later
+# Update the train data frame with proper factor labels
+trainn <- train %>%
+  mutate(loan_type = factor(loan_type,
+                            levels = c(1, 2, 3, 4),
+                            labels = c("Conventional", "FHA insured", "VA guaranteed", "RHS or FSA guaranteed"))) %>%
+  mutate(loan_purpose = factor(loan_purpose,
+                               levels = c(1, 2, 31, 32, 4, 5),
+                               labels = c("Home purchase", "Home improvement", "Refinancing", "Cash-out refinancing", "Other purpose", "Not applicable")))
+
+# Calculate counts
+interaction_table <- table(trainn$loan_purpose, trainn$loan_type)
+interaction_df <- as.data.frame(interaction_table)
+colnames(interaction_df) <- c("Loan_Purpose", "Loan_Type", "Count")
+
+# Calculate the total counts for each Loan Purpose
+total_counts <- aggregate(Count ~ Loan_Purpose, data = interaction_df, FUN = sum)
+
+# Join total counts to individual counts and calculate percentages
+interaction_df <- merge(interaction_df, total_counts, by = "Loan_Purpose")
+colnames(interaction_df)[4] <- "Total"
+interaction_df$Percentage <- (interaction_df$Count / interaction_df$Total) * 100
+
+# Plotting
+ggplot(interaction_df, aes(x = Loan_Purpose, y = Percentage, fill = Loan_Type)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_manual(values = c("Conventional" = "blue", "FHA insured" = "green", "VA guaranteed" = "red", "RHS or FSA guaranteed" = "purple")) +
+  labs(
+    title = "Interaction between Loan Purpose and Loan Type by Percentage",
+    x = "Loan Purpose",
+    y = "Percentage"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Plotting with a stacked bar chart
+ggplot(interaction_df, aes(x = Loan_Purpose, y = Percentage, fill = Loan_Type)) +
+  geom_bar(stat = "identity", position = "stack") +  # Using "stack" for stacked bar chart
+  scale_fill_manual(values = c("Conventional" = "blue", "FHA insured" = "green", "VA guaranteed" = "red", "RHS or FSA guaranteed" = "purple")) +
+  labs(
+    title = "Interaction between Loan Purpose and Loan Type by Percentage",
+    x = "Loan Purpose",
+    y = "Percentage"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))  # Rotating x-axis labels
+
+
+```
+
+```{r}
+# Convert action_taken to a factor with meaningful names
+action<- train %>% mutate(action_taken = factor(action_taken, levels = c(1, 3),
+                               labels = c("Loan Originated", "Application Denied")))
+
+# Relationship between income and action_taken with jitter points
+ggplot(action, aes(x = action_taken, y = income, color = action_taken)) +
+  geom_boxplot(alpha = 0.7) +
+  geom_jitter(width = 0.2, alpha = 0.5) +
+  labs(x = "Action Taken", y = "Income", title = "Relationship between income and action_taken") +
+  theme(text = element_text(size = 12),
+        plot.title = element_text(size = 13))
+
+# Relationship between log-transformed income and action_taken with jitter points
+ggplot(action, aes(x = action_taken, y = log10(income), color = action_taken)) +
+  geom_boxplot(alpha = 0.7) +
+  geom_jitter(width = 0.1, alpha = 0.1) +
+  labs(x = "Action Taken", y = "Log10(Income)", title = "Relationship between log-transformed income and action_taken") +
+  theme(text = element_text(size = 12),
+        plot.title = element_text(size = 13))
+
+```
+
+```{r}
+#Race and Action both Count and Percentages 
+
+# Count the number of instances for each category
+counts <- train %>%
+  group_by(race_of_applicant_or_borrower_1, action_taken) %>%
+  summarise(count = n()) %>%
+  ungroup()
+
+# Filter the counts
+filtered_counts <- counts %>% 
+  filter(count >= 1300)
+
+# Update the train data frame
+train <- train %>%
+  mutate(
+    race_of_applicant_or_borrower_1 = factor(
+      race_of_applicant_or_borrower_1,
+      levels = c(1, 2, 21, 22, 23, 24, 25, 26, 27, 3, 4, 41, 42, 43, 44, 5, 6, 7),
+      labels = c(
+        "American Indian or Alaska Native", "Asian", "Asian Indian", "Chinese", "Filipino", "Japanese",
+        "Korean", "Vietnamese", "Other Asian", "Black or African American",
+        "Native Hawaiian or Other Pacific Islander", "Native Hawaiian", "Guamanian or Chamorro",
+        "Samoan", "Other Pacific Islander", "White", "Information not provided", "Not applicable"
+      )
+    ),
+    action_taken = factor(action_taken, levels = c(1, 3), labels = c("Loan Originated", "Application Denied"))
+  )
+
+# Use filtered_counts for plotting
+ggplot(filtered_counts, aes(x = race_of_applicant_or_borrower_1, y = count, 
+                            fill = action_taken)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_manual(values = c("Loan Originated" = "blue", "Application Denied" = "red")) +
+  labs(
+    title = "Disparities in Loan Actions Across Different Races (Filtered by 1300+ counts)",
+    x = "Race of Applicant",
+    y = "Count"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+#Disparities in Loan Actions Across Different Races by Percentage
+train <- read_csv('train2.csv', show_col_types = FALSE)
+
+# Calculate the total counts for each race
+total_counts <- counts %>%
+  group_by(race_of_applicant_or_borrower_1) %>%
+  summarise(total = sum(count))
+
+# Join total counts to individual counts and calculate percentages
+counts <- left_join(counts, total_counts, by = "race_of_applicant_or_borrower_1") %>%
+  mutate(percentage = (count / total) * 100)
+
+# Filter the counts
+filtered_counts <- counts %>% 
+  filter(count >= 1300)
+
+# Plotting
+ggplot(filtered_counts, aes(x = race_of_applicant_or_borrower_1, y = percentage, fill = action_taken)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_manual(values = c("Loan Originated" = "blue", "Application Denied" = "red")) +
+  labs(
+    title = "Disparities in Loan Actions Across Different Races by Percentage (Filtered by 100+ counts)",
+    x = "Race of Applicant",
+    y = "Percentage"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+
+```{r}
+top_states <- train %>%
+  group_by(state) %>%
+  summarise(median_loan = median(loan_amount, na.rm = TRUE)) %>%
+  arrange(desc(median_loan)) %>%
+  head(10)
+
+top_states
+filtered_train2 <- train %>% 
+  filter(state %in% top_states$state)
+
+#Loan Amount by Top 10 States
+ggplot(filtered_train2, aes(x = state, y = log10(loan_amount), fill = state)) +
+  geom_boxplot() +
+  labs(title = "Loan Amount by Top 10 States (by Median Loan Amount)",
+       x = "State",
+       y = "Loan Amount") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+#Preproval vs Action Taken 
+
+train <- read_csv('train2.csv', show_col_types = FALSE)
+
+# Mutate the 'preapproval' column to have descriptive labels
+train2_mutated <- train %>%
+  mutate(preapproval = case_when(
+    preapproval == 1 ~ "Preapproval Requested",
+    preapproval == 2 ~ "Preapproval Not Requested",
+    TRUE ~ "Other"
+  ))
+
+# Plot the data
+ggplot(train2_mutated, aes(x = preapproval, fill = as.factor(action_taken))) +
+  geom_bar(position = "dodge") +
+  ggtitle("Preapproval vs Action Taken") +
+  xlab("Preapproval Status") +
+  ylab("Count") +
+  scale_fill_manual(values = c("blue", "red"), 
+                    name = "Action Taken",
+                    labels = c("Action 1", "Action 2"))
+
+
+```
+
+```{r}
+# Sex of applicant 
+
+# First, mutate the dataset to convert numerical codes to descriptive labels
+train2_sex <- train %>%
+  mutate(sex_of_applicant_or_borrower = case_when(
+    sex_of_applicant_or_borrower == 1 ~ "Male",
+    sex_of_applicant_or_borrower == 2 ~ "Female",
+    sex_of_applicant_or_borrower == 3 ~ "Info not provided (Mail/Internet/Telephone)",
+    sex_of_applicant_or_borrower == 4 ~ "Not applicable",
+    sex_of_applicant_or_borrower == 6 ~ "Both Male and Female",
+    TRUE ~ "Other"),
+    action_taken = as.factor(action_taken)  # Convert action_taken to a factor
+  )
+
+# Then, create the ggplot graph
+ggplot(train2_sex, aes(x = sex_of_applicant_or_borrower, fill = as.factor(action_taken))) + 
+  geom_bar(position = "dodge") +
+  ggtitle("Sex of Applicant vs Action Taken") +
+  xlab("Sex") +
+  ylab("Count") +
+  scale_fill_brewer(palette="Set1", name="Action Taken") +  # You can change the palette or use scale_fill_manual() for custom colors
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Optional: rotate x-axis text for better readability
+
+```
+
+```{r}
+#Age of Applicants 
+
+train2_age <- train %>% mutate(
+  age_cat = factor(age_of_applicant_or_borrower, 
+                   levels = c("0-18", "19-24", "25-34", "35-44", "45-54", "55-64", "65+"),
+                   ordered = TRUE)
+)
+
+# Create the ggplot graph
+ggplot(train2_age, aes(x = age_cat, fill = as.factor(action_taken))) + 
+  geom_bar(position = "dodge") +
+  ggtitle("Age Category vs Action Taken") +
+  xlab("Age Category") +
+  ylab("Count") +
+  scale_fill_brewer(palette = "Set1", name = "Action Taken") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
 ```
 
 # Preprocessing / Recipes
